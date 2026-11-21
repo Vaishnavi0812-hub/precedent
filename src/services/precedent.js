@@ -5,7 +5,7 @@
 import { getIssue, addComment, addLabels, getSubtaskTypeId, createIssue, setIssueProperty, jiraBaseUrl } from '../atlassian.js';
 import { adfToText } from '../engine/extract.js';
 import { matchChange, changeFromIssue, LEVELS } from '../engine/match.js';
-import { getIndex, getIssueState, updateIssueState, getConfig, bumpStat, listLessons } from '../store.js';
+import { getIndex, getIssueState, updateIssueState, getConfig, bumpStat, listLessons, recordHit } from '../store.js';
 import { isIncidentIssue } from './ingest.js';
 import { whoHasBeenHere } from './graph.js';
 
@@ -113,6 +113,7 @@ export async function applyGuardrail(issueKey, lessonId, guardrail) {
   }
   await addLabels(issueKey, ['precedent-guarded']).catch(() => {});
   await updateIssueState(issueKey, (s) => ({ ...s, applied: [...s.applied, { lessonId, guardrail, key: created?.key, at: new Date().toISOString() }] }));
+  await recordHit(lessonId, issueKey, 'guarded', { summary: issue.fields.summary, guardrail, subtask: created?.key });
   await bumpStat('guardrailsApplied');
   return { subtaskKey: created?.key || null, url: created?.key ? `${await jiraBaseUrl()}/browse/${created.key}` : null };
 }
@@ -130,9 +131,14 @@ export async function autoFlag(issueKey) {
   if (!index.N) return null;
   const minConfidence = config.autoFlagMinLevel === 'medium' ? LEVELS.medium : LEVELS.high;
   const state = await getIssueState(issueKey);
-  const matches = matchChange(index, issueToChange(issue), {
-    limit: 2, minConfidence, excludeIds: [`jira:${issueKey}`, ...state.dismissed, ...state.flagged],
+  const all = matchChange(index, issueToChange(issue), {
+    limit: 2, minConfidence, excludeIds: [`jira:${issueKey}`, ...state.dismissed],
   });
+  // Already-flagged precedents: just make sure the impact record exists (idempotent), no new comment.
+  for (const m of all.filter((x) => state.flagged.includes(x.lesson.id))) {
+    await recordHit(m.lesson.id, issueKey, 'flagged', { summary: issue.fields.summary, level: m.level });
+  }
+  const matches = all.filter((x) => !state.flagged.includes(x.lesson.id));
   if (!matches.length) return null;
 
   const top = matches.map(presentMatch);
@@ -140,6 +146,7 @@ export async function autoFlag(issueKey) {
   await addLabels(issueKey, ['precedent-flagged']).catch(() => {});
   await setIssueProperty(issueKey, 'precedent', { flagged: true, count: top.length, top: top[0].title, level: top[0].level }).catch(() => {});
   await updateIssueState(issueKey, (s) => ({ ...s, flagged: [...s.flagged, ...top.map((m) => m.id)] }));
+  for (const m of top) await recordHit(m.id, issueKey, 'flagged', { summary: issue.fields.summary, level: m.level });
   await bumpStat('issuesFlagged');
   return top;
 }

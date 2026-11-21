@@ -42,7 +42,11 @@ function App() {
   const [workProject, setWorkProject] = useState(null);
   const poll = useRef(null);
 
-  const load = useCallback(() => invoke('getAdminState').then(setState).catch((e) => setError(e.message)), []);
+  const [impact, setImpact] = useState(null);
+  const load = useCallback(() => {
+    invoke('getImpact').then(setImpact).catch(() => setImpact(null));
+    return invoke('getAdminState').then(setState).catch((e) => setError(e.message));
+  }, []);
   useEffect(() => { load(); return () => clearInterval(poll.current); }, [load]);
 
   const seedRunning = state?.seed && ['queued', 'running'].includes(state.seed.status);
@@ -98,12 +102,46 @@ function App() {
         </Text>
       </Stack>
 
-      <Inline space="space.200" shouldWrap>
-        <Stat label="Lessons learned" value={lessons.length} />
-        <Stat label="Issues flagged" value={stats.issuesFlagged} />
-        <Stat label="Guardrails added" value={stats.guardrailsApplied} />
-        <Stat label="Dismissed as not relevant" value={stats.dismissed} />
-      </Inline>
+      {/* ---- Impact ---- */}
+      <Box xcss={panel}>
+        <Stack space="space.200">
+          <Inline space="space.100" alignBlock="center">
+            <Heading size="medium">Impact</Heading>
+            <Lozenge appearance="success">Repeat incidents caught before shipping</Lozenge>
+          </Inline>
+          {impact ? (
+            <>
+              <Inline space="space.200" shouldWrap>
+                <Stat label="Near-misses caught" value={impact.nearMissCount} />
+                <Stat label="Outage minutes those same mistakes cost last time" value={impact.minutesAtRisk.toLocaleString()} />
+                <Stat label="Would-be SEV1 repeats" value={impact.sev1Repeats} />
+                <Stat label="Guardrails adopted" value={impact.guardrailsAdopted} />
+                <Stat label="Average postmortem quality" value={`${impact.avgQuality}%`} />
+              </Inline>
+              {impact.nearMisses.length ? (
+                <DynamicTable
+                  rowsPerPage={6}
+                  head={{ cells: [{ key: 'i', content: 'Change' }, { key: 'p', content: 'Resembled' }, { key: 'm', content: 'Cost last time' }, { key: 'g', content: 'Status' }] }}
+                  rows={impact.nearMisses.map((n) => ({
+                    key: n.issueKey,
+                    cells: [
+                      { key: 'i', content: <Link href={`/browse/${n.issueKey}`} openNewTab>{`${n.issueKey} ${n.summary || ''}`}</Link> },
+                      { key: 'p', content: n.precedent || '—' },
+                      { key: 'm', content: n.minutes ? `${n.severity} · ${n.minutes} min outage` : (n.severity || '—') },
+                      { key: 'g', content: <Lozenge appearance={n.guarded ? 'success' : 'moved'}>{n.guarded ? 'Guardrails added' : 'Warned'}</Lozenge> },
+                    ],
+                  }))}
+                />
+              ) : (
+                <Text color="color.text.subtle">No near-misses yet. When new work resembles a past incident, it shows up here.</Text>
+              )}
+            </>
+          ) : <Spinner size="small" label="Loading impact" />}
+          <Inline space="space.200" shouldWrap>
+            <Text size="small" color="color.text.subtle">{`${lessons.length} lessons learned · ${stats.issuesFlagged || 0} warnings posted · ${stats.dismissed || 0} dismissed as not relevant`}</Text>
+          </Inline>
+        </Stack>
+      </Box>
 
       {/* ---- Demo history ---- */}
       <Box xcss={panel}>

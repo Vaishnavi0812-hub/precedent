@@ -109,3 +109,32 @@ export async function bumpStat(name, by = 1) {
 export async function getStats() {
   return (await kvs.get('stats')) || {};
 }
+
+/* ---------- impact tracking: which lesson protected which change ---------- */
+
+const hitKey = (lessonId) => `hits:${lessonId}`.replace(/[^a-zA-Z0-9:._#\s-]/g, '_');
+
+/**
+ * Record that a lesson caught (flagged) or guarded (guardrail added) a change.
+ * kind: 'flagged' | 'guarded'. Idempotent per issue + kind.
+ */
+export async function recordHit(lessonId, issueKey, kind, extra = {}) {
+  if (!lessonId || !issueKey) return;
+  const hits = (await kvs.get(hitKey(lessonId))) || [];
+  if (hits.some((h) => h.issueKey === issueKey && h.kind === kind)) return;
+  hits.push({ issueKey, kind, at: new Date().toISOString(), ...extra });
+  await kvs.set(hitKey(lessonId), hits.slice(-200));
+  const index = (await kvs.get('hits:index')) || [];
+  if (!index.includes(lessonId)) await kvs.set('hits:index', [...index, lessonId].slice(-1000));
+}
+
+export async function getHits(lessonId) {
+  return (await kvs.get(hitKey(lessonId))) || [];
+}
+
+export async function getAllHits() {
+  const index = (await kvs.get('hits:index')) || [];
+  const out = {};
+  for (const id of index) out[id] = await getHits(id);
+  return out;
+}

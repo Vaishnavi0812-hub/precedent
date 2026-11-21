@@ -9,6 +9,7 @@ import { startSeedJob, runSeedSlice, getSeedProgress, failSeed } from './service
 import { getConfig, setConfig, getStats, listLessons, clearLessons } from './store.js';
 import { listProjects, getIssue } from './atlassian.js';
 import { probeGraph } from './services/graph.js';
+import { coachPage, bylineTitle, computeImpact } from './services/coach.js';
 
 // @forge/resolver is CommonJS; under "type": "module" the default import is the
 // namespace object, so unwrap it to get the class.
@@ -73,6 +74,16 @@ resolver.define('getSeedProgress', async () => getSeedProgress());
 
 resolver.define('syncNow', async () => syncAll());
 
+resolver.define('getImpact', async () => computeImpact());
+
+/* ---------------- Confluence: Postmortem Quality Coach ---------------- */
+
+resolver.define('coachPage', async ({ context }) => {
+  const pageId = context.extension?.content?.id;
+  if (!pageId) return { error: 'Open this from a Confluence page.' };
+  return coachPage(pageId);
+});
+
 resolver.define('probeGraph', async () => {
   try {
     const summary = await probeGraph();
@@ -89,6 +100,13 @@ resolver.define('saveConfig', async ({ payload }) => setConfig(payload));
 resolver.define('clearLessons', async () => ({ removed: await clearLessons() }));
 
 export const handler = resolver.getDefinitions();
+
+/** Byline title shows the page's score at a glance, e.g. "Precedent · 85% actionable · protected 3". */
+export async function bylineProps(payload) {
+  const pageId = payload?.extension?.content?.id || payload?.context?.extension?.content?.id || payload?.contentId;
+  if (!pageId) console.log('bylineProps payload keys', Object.keys(payload || {}));
+  return { title: pageId ? await bylineTitle(pageId) : 'Precedent', tooltip: 'How actionable this postmortem is, and the changes it has protected' };
+}
 
 /* ---------------- Async jobs ---------------- */
 

@@ -147,6 +147,18 @@ modules:
           required: true
           description: An incident or decision reference like INC-105 or ADR-007, or a few keywords.
 
+  confluence:contentBylineItem:
+    - key: precedent-coach
+      title: Precedent
+      tooltip: How actionable this postmortem is, and the changes it has protected
+      icon: https://raw.githubusercontent.com/Vaishnavi0812-hub/precedent/main/assets/icon.svg
+      resource: coach
+      render: native
+      resolver:
+        function: resolver
+      dynamicProperties:
+        function: byline-props
+
   jira:adminPage:
     - key: precedent-admin
       resource: admin
@@ -180,6 +192,8 @@ modules:
       function: job-consumer
 
   function:
+    - key: byline-props
+      handler: index.bylineProps
     - key: rovo-search
       handler: index.rovoSearch
     - key: rovo-check-issue
@@ -209,6 +223,8 @@ resources:
     path: src/frontend/panel.jsx
   - key: admin
     path: src/frontend/admin.jsx
+  - key: coach
+    path: src/frontend/coach.jsx
 
 permissions:
   scopes:
