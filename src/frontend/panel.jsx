@@ -39,6 +39,13 @@ function fmtDate(d) {
   return dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric', timeZone: 'UTC' });
 }
 
+/** "INC-101" / "ADR-007" from a lesson title, else a readable fallback. */
+function refOf(m) {
+  const ref = (m.title || '').match(/\b(INC|ADR|PIR|SEV)-?\d+\b/i);
+  if (ref) return ref[0].toUpperCase();
+  return m.sourceType === 'decision' ? 'A past decision' : 'A past incident';
+}
+
 function fmtDuration(m) {
   if (!m) return null;
   if (m >= 1440) return `${Math.round(m / 1440)}d outage`;
@@ -199,8 +206,8 @@ function App() {
         <SectionMessage appearance="warning" title="Déjà vu — this change looks like something that has hurt us before">
           <Text>
             {top.sourceType === 'decision'
-              ? `It touches a rule the team agreed on in ${top.title.split(':')[0]}. Review it before you start.`
-              : `${top.title.split(/[:—]/)[0].trim()}${top.durationMin ? ` caused a ${fmtDuration(top.durationMin)}` : ''}. Review what went wrong and add the guardrails before you ship.`}
+              ? `It touches a rule the team agreed on in ${refOf(top)}. Review it before you start.`
+              : `${refOf(top)}${top.durationMin ? ` caused a ${fmtDuration(top.durationMin)}` : ' hurt us'}${top.date ? ` in ${fmtDate(top.date)}` : ''}. Review what went wrong and add the guardrails before you ship.`}
           </Text>
         </SectionMessage>
       ) : strong.length ? (

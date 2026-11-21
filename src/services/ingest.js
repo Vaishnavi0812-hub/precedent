@@ -36,13 +36,21 @@ export async function fetchIncidentLessons(config) {
  * postmortem lesson and link the incident to it instead of storing a duplicate.
  */
 export function mergeLessons(pageLessons, incidentLessons) {
-  const byIncident = new Map();
-  for (const l of pageLessons) if (l.incidentKey) byIncident.set(l.incidentKey, l);
+  // Postmortems usually reference their incident by Jira key, and/or share a
+  // human reference like "INC-101" in the title. Either link merges the two.
+  const refs = (l) => new Set((l.title || '').match(/\b(?:INC|PIR)-\d+\b/gi)?.map((r) => r.toUpperCase()) || []);
+  const byKey = new Map();
+  const byRef = new Map();
+  for (const l of pageLessons) {
+    if (l.incidentKey) byKey.set(l.incidentKey, l);
+    if (l.sourceType === 'postmortem') for (const r of refs(l)) byRef.set(r, l);
+  }
   const merged = [...pageLessons];
   for (const inc of incidentLessons) {
-    const pm = byIncident.get(inc.sourceKey);
+    const pm = byKey.get(inc.sourceKey) || [...refs(inc)].map((r) => byRef.get(r)).find(Boolean);
     if (pm) {
-      pm.incidentUrl = inc.url;
+      pm.incidentUrl = pm.incidentUrl || inc.url;
+      pm.incidentKey = pm.incidentKey || inc.sourceKey;
       pm.components = [...new Set([...(pm.components || []), ...(inc.components || [])])];
       pm.severity = pm.severity || inc.severity;
     } else {

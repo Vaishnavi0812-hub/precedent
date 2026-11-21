@@ -26,10 +26,21 @@ export function fieldForHeading(heading) {
   return null;
 }
 
-const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&nbsp;': ' ', '&rsquo;': "'", '&lsquo;': "'", '&ldquo;': '"', '&rdquo;': '"', '&mdash;': '—', '&ndash;': '–', '&hellip;': '…' };
+const ENTITIES = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: "'", lsquo: "'", ldquo: '"', rdquo: '"',
+  mdash: '—', ndash: '–', hellip: '…', rarr: '→', larr: '←', harr: '↔', uarr: '↑', darr: '↓', rArr: '⇒',
+  times: '×', divide: '÷', plusmn: '±', le: '≤', ge: '≥', ne: '≠', asymp: '≈', deg: '°', middot: '·',
+  bull: '•', trade: '™', copy: '©', reg: '®', euro: '€', pound: '£', sect: '§', para: '¶', laquo: '«', raquo: '»',
+};
 
 export function decodeEntities(s) {
-  return s.replace(/&[a-z#0-9]+;/gi, (m) => ENTITIES[m] ?? (m.startsWith('&#') ? String.fromCharCode(parseInt(m.slice(2), 10)) : m));
+  return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, code) => {
+    if (code[0] === '#') {
+      const n = code[1] === 'x' || code[1] === 'X' ? parseInt(code.slice(2), 16) : parseInt(code.slice(1), 10);
+      return Number.isFinite(n) ? String.fromCodePoint(n) : m;
+    }
+    return ENTITIES[code] ?? ENTITIES[code.toLowerCase()] ?? m;
+  });
 }
 
 /** Strip storage-format HTML to text, keeping list items as separate lines. */
@@ -95,7 +106,7 @@ export function adfToSections(doc) {
 
 function splitList(text) {
   return text
-    .split(/\n|•|;(?=\s)/)
+    .split(/\n|•/)
     .map((s) => s.replace(/^[-*\d.)\s]+/, '').trim())
     .filter((s) => s.length > 1);
 }

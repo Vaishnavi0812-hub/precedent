@@ -16,6 +16,7 @@ import {
   renderPostmortemStorage, renderDecisionStorage, renderIncidentAdf,
 } from '../data/demo-history.js';
 import { syncAll } from './ingest.js';
+import { autoFlag } from './precedent.js';
 import { setConfig } from '../store.js';
 
 export const SPACE_KEY = 'LUMEN';
@@ -287,7 +288,12 @@ async function runTask(task, state) {
     }
     case 'work': {
       const change = DEMO_CHANGES[task.index];
-      if (state.existingWork?.[change.summary]) { state.createdWork.push(state.existingWork[change.summary]); return null; }
+      const existingKey = state.existingWork?.[change.summary];
+      if (existingKey) {
+        state.createdWork.push(existingKey);
+        await autoFlag(existingKey).catch((e) => console.warn(`autoFlag ${existingKey}: ${e.message}`));
+        return null;
+      }
       const created = await createIssue(fieldsWithComponents({
         project: { key: state.workProjectKey },
         issuetype: { id: state.workType },
@@ -296,7 +302,9 @@ async function runTask(task, state) {
         labels: ['precedent-demo'],
       }, change.components, state.workComponents));
       state.createdWork.push(created.key);
-      return `Work item ${created.key}: ${change.summary}`;
+      // The issue-created trigger ignores the app's own actions, so flag demo work explicitly.
+      const flagged = await autoFlag(created.key).catch((e) => { console.warn(`autoFlag ${created.key}: ${e.message}`); return null; });
+      return `Work item ${created.key}: ${change.summary}${flagged?.length ? ' (flagged)' : ''}`;
     }
     case 'finish': {
       await progress({
