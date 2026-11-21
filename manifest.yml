@@ -28,6 +28,9 @@ modules:
           retry storm"), call get-lesson.
         - When someone asks where the organisation keeps getting hurt, what to invest in,
           or which systems are fragile, call risk-hotspots.
+        - When someone asks who knows about an incident, who to talk to, or who has
+          been here before, call who-knows. After a strong precedent, offer to find the
+          people who handled it.
         - Only call add-guardrail when the user explicitly asks you to add a guardrail to an
           issue. Confirm the exact guardrail text and issue key in your reply.
 
@@ -58,6 +61,7 @@ modules:
         - get-lesson
         - risk-hotspots
         - add-guardrail
+        - who-knows
 
   rovo:mcp:
     - key: precedent-mcp
@@ -68,6 +72,7 @@ modules:
         - get-lesson
         - risk-hotspots
         - add-guardrail
+        - who-knows
 
   action:
     - key: search-precedents
@@ -130,6 +135,18 @@ modules:
           required: true
           description: The guardrail text to add, as returned by a previous precedent check.
 
+    - key: who-knows
+      name: Who has been here before
+      function: rovo-who-knows
+      actionVerb: GET
+      description: Use Teamwork Graph to find the people connected to a past incident or decision (postmortem author, owners, contributors), their teams, and related pages.
+      inputs:
+        reference:
+          title: Reference
+          type: string
+          required: true
+          description: An incident or decision reference like INC-105 or ADR-007, or a few keywords.
+
   jira:adminPage:
     - key: precedent-admin
       resource: admin
@@ -173,6 +190,8 @@ modules:
       handler: index.rovoHotspots
     - key: rovo-add-guardrail
       handler: index.rovoAddGuardrail
+    - key: rovo-who-knows
+      handler: index.rovoWhoKnows
     - key: resolver
       handler: index.handler
     - key: issue-events
@@ -211,6 +230,11 @@ permissions:
     - write:page:confluence
     - read:label:confluence
     - write:label:confluence
+    - read:graph:page:confluence
+    - read:graph:user:atlassian
+    - read:graph:team:atlassian
+    - read:graph:issue:jira
+    - read:graph:issue-comment:jira
 
 app:
   runtime:

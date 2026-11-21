@@ -328,6 +328,14 @@ export const DEMO_CHANGES = [
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const fmtDuration = (m) => (m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`);
 
+/** Which decision record each incident led to (rendered as a real Confluence link). */
+export const FOLLOW_UP_DECISION = { 'INC-105': 'ADR-007', 'INC-102': 'ADR-012', 'INC-103': 'ADR-015', 'INC-106': 'ADR-019' };
+
+const decisionLink = (ref) => {
+  const adr = DECISIONS.find((d) => d.ref === ref);
+  return adr ? `<h2>See also</h2><p><ac:link><ri:page ri:content-title="${esc(adr.title)}" /></ac:link></p>` : '';
+};
+
 /** Render a postmortem in Confluence storage format, following a standard template. */
 export function renderPostmortemStorage(inc, incidentKey) {
   return [
@@ -338,7 +346,8 @@ export function renderPostmortemStorage(inc, incidentKey) {
     `<h2>Root cause</h2><p>${esc(inc.rootCause)}</p>`,
     `<h2>Affected components</h2><p>${inc.components.map(esc).join(', ')}</p>`,
     `<h2>Guardrails</h2><ul>${inc.guardrails.map((g) => `<li>${esc(g)}</li>`).join('')}</ul>`,
-  ].join('\n');
+    decisionLink(FOLLOW_UP_DECISION[inc.ref]),
+  ].filter(Boolean).join('\n');
 }
 
 /** Render an ADR in Confluence storage format. */

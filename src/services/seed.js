@@ -9,11 +9,11 @@ import { kvs } from '@forge/kvs';
 import { route } from '@forge/api';
 import {
   ensureSpace, findPageByTitle, createPage, addPageLabels,
-  listProjects, createProject, createIssue, searchIssues, jira, confluence,
+  listProjects, createProject, createIssue, searchIssues, jira, confluence, updatePageBody,
 } from '../atlassian.js';
 import {
   DEMO_COMPANY, INCIDENTS, DECISIONS, DEMO_CHANGES,
-  renderPostmortemStorage, renderDecisionStorage, renderIncidentAdf,
+  renderPostmortemStorage, renderDecisionStorage, renderIncidentAdf, FOLLOW_UP_DECISION,
 } from '../data/demo-history.js';
 import { syncAll } from './ingest.js';
 import { autoFlag } from './precedent.js';
@@ -162,8 +162,9 @@ export function seedTasks() {
     { id: 'incident-setup' },
     ...INCIDENTS.map((inc) => ({ id: 'incident', ref: inc.ref })),
     { id: 'space' },
-    ...INCIDENTS.map((inc) => ({ id: 'postmortem', ref: inc.ref })),
+    // Decisions first, so postmortems can link to the decision that followed them.
     ...DECISIONS.map((d) => ({ id: 'decision', ref: d.ref })),
+    ...INCIDENTS.map((inc) => ({ id: 'postmortem', ref: inc.ref })),
     { id: 'learn' },
     { id: 'work-setup' },
     ...DEMO_CHANGES.map((_, i) => ({ id: 'work', index: i })),
@@ -265,7 +266,15 @@ async function runTask(task, state) {
       const title = `Postmortem: ${inc.ref} — ${inc.title}`;
       state.pageIds = state.pageIds || [];
       const existing = await findPageByTitle(state.spaceKey, title);
-      if (existing) { state.pageIds.push(existing.id); return null; }
+      if (existing) {
+        state.pageIds.push(existing.id);
+        // Older demo pages predate the decision links; add them so Teamwork Graph has edges to traverse.
+        if (FOLLOW_UP_DECISION[inc.ref]) {
+          await updatePageBody(existing.id, title, renderPostmortemStorage(inc, state.incidentKeys[inc.ref]))
+            .catch((e) => console.warn(`relink ${inc.ref}: ${e.message}`));
+        }
+        return null;
+      }
       const page = await createPage({ spaceKey: state.spaceKey, title, parentId: state.pmParentId, storage: renderPostmortemStorage(inc, state.incidentKeys[inc.ref]) });
       await addPageLabels(page.id, ['postmortem', ...inc.tags.map((t) => t.toLowerCase())]);
       state.pageIds.push(page.id);

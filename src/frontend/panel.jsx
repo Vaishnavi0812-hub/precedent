@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import ForgeReconciler, {
   Box, Stack, Inline, Text, Link, Lozenge, Button, SectionMessage,
-  Spinner, Tag, TagGroup, EmptyState, Icon, Tooltip, xcss,
+  Spinner, Tag, TagGroup, EmptyState, Icon, Tooltip, User, xcss,
 } from '@forge/react';
 import { invoke, router, view } from '@forge/bridge';
 
@@ -82,6 +82,55 @@ function Guardrail({ text, applied, onApply, busy }) {
   );
 }
 
+/** Teamwork Graph: people connected to the postmortem, their teams, related pages. Loaded on demand. */
+function WhoKnows({ lessonId }) {
+  const [state, setState] = useState(null);
+  const load = async () => {
+    setState({ loading: true });
+    try {
+      setState(await invoke('getPeople', { lessonId }));
+    } catch (e) {
+      setState({ error: e.message || String(e), people: [], relatedPages: [] });
+    }
+  };
+  if (!state) {
+    return (
+      <Inline>
+        <Button appearance="subtle" spacing="compact" iconBefore="people-group" onClick={load}>Who has been here before?</Button>
+      </Inline>
+    );
+  }
+  if (state.loading) {
+    return (
+      <Inline space="space.100" alignBlock="center">
+        <Spinner size="small" />
+        <Text size="small" color="color.text.subtle">Tracing this incident through Teamwork Graph…</Text>
+      </Inline>
+    );
+  }
+  return (
+    <Stack space="space.075">
+      <Text size="small" weight="semibold" color="color.text.subtle">WHO HAS BEEN HERE BEFORE · TEAMWORK GRAPH</Text>
+      {state.error ? <Text size="small" color="color.text.danger">{state.error}</Text> : null}
+      {state.people?.length ? state.people.map((p) => (
+        <Inline key={p.accountId} space="space.100" alignBlock="center" shouldWrap>
+          <User accountId={p.accountId} />
+          <Text size="small" color="color.text.subtle">{p.roles.join(', ')}</Text>
+          {p.teams?.slice(0, 2).map((t) => <Lozenge key={t.name} appearance="default">{t.name}</Lozenge>)}
+        </Inline>
+      )) : !state.error ? (
+        <Text size="small" color="color.text.subtle">{state.note || 'No people are recorded against this page yet. Whoever edits the postmortem next becomes the person to ask.'}</Text>
+      ) : null}
+      {state.relatedPages?.length ? (
+        <Inline space="space.075" alignBlock="center" shouldWrap>
+          <Text size="small" color="color.text.subtlest">Related reading</Text>
+          {state.relatedPages.slice(0, 4).map((p) => <Link key={p.url || p.title} href={p.url} openNewTab>{p.title}</Link>)}
+        </Inline>
+      ) : null}
+    </Stack>
+  );
+}
+
 function PrecedentCard({ m, applied, onApply, onDismiss, busyKey }) {
   const meta = [fmtDate(m.date), m.severity, fmtDuration(m.durationMin)].filter(Boolean).join(' · ');
   const isDecision = m.sourceType === 'decision';
@@ -132,6 +181,8 @@ function PrecedentCard({ m, applied, onApply, onDismiss, busyKey }) {
             ))}
           </Stack>
         ) : null}
+
+        {m.sourceType !== 'incident' ? <WhoKnows lessonId={m.id} /> : null}
 
         <Inline space="space.075" alignBlock="center" shouldWrap>
           <Text size="small" color="color.text.subtlest">Matched on</Text>

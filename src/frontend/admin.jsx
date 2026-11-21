@@ -72,6 +72,12 @@ function App() {
     try { await invoke('syncNow'); await load(); } finally { setSyncing(false); }
   };
 
+  const [graph, setGraph] = useState(null);
+  const checkGraph = async () => {
+    setGraph({ loading: true });
+    try { setGraph(await invoke('probeGraph')); } catch (e) { setGraph({ ok: false, error: e.message || String(e) }); }
+  };
+
   const toggleAutoFlag = async () => {
     const config = await invoke('saveConfig', { autoFlag: !state.config.autoFlag });
     setState((s) => ({ ...s, config }));
@@ -161,6 +167,27 @@ function App() {
           <Inline space="space.100" alignBlock="center">
             <Toggle id="autoflag" isChecked={config.autoFlag} onChange={toggleAutoFlag} />
             <Label labelFor="autoflag">Comment on new issues when there is a strong match</Label>
+          </Inline>
+        </Stack>
+      </Box>
+
+      {/* ---- Teamwork Graph ---- */}
+      <Box xcss={panel}>
+        <Stack space="space.200">
+          <Inline space="space.100" alignBlock="center">
+            <Heading size="medium">Teamwork Graph</Heading>
+            <Lozenge appearance="new">Who has been here before</Lozenge>
+          </Inline>
+          <Text>
+            Precedent uses Teamwork Graph to find the people connected to each past incident (who wrote the postmortem, who owns it, who contributed) and the teams they belong to, so you know who to ask before you ship.
+          </Text>
+          <Inline space="space.200" alignBlock="center" shouldWrap>
+            <Button isDisabled={graph?.loading} onClick={checkGraph}>{graph?.loading ? 'Checking…' : 'Check Teamwork Graph connection'}</Button>
+            {graph && !graph.loading ? (
+              graph.ok
+                ? <Lozenge appearance="success">{`Connected · ${graph.found.length} of ${graph.found.length + graph.missing.length} graph queries available`}</Lozenge>
+                : <Text size="small" color="color.text.danger">{graph.error}</Text>
+            ) : null}
           </Inline>
         </Stack>
       </Box>

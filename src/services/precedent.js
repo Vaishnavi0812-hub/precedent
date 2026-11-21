@@ -7,6 +7,7 @@ import { adfToText } from '../engine/extract.js';
 import { matchChange, changeFromIssue, LEVELS } from '../engine/match.js';
 import { getIndex, getIssueState, updateIssueState, getConfig, bumpStat, listLessons } from '../store.js';
 import { isIncidentIssue } from './ingest.js';
+import { whoHasBeenHere } from './graph.js';
 
 export function issueToChange(issue) {
   const f = issue.fields || {};
@@ -174,4 +175,21 @@ export function flagCommentAdf(matches) {
       ],
     },
   ]);
+}
+
+/**
+ * "Who has been here before?" for a lesson: people connected to its postmortem or
+ * decision page in Teamwork Graph, their teams, and related pages.
+ */
+export async function peopleForLesson(lessonId, cloudId) {
+  const lessons = await listLessons();
+  const lesson = lessons.find((l) => l.id === lessonId)
+    || lessons.find((l) => (l.title || '').toUpperCase().includes(String(lessonId).toUpperCase()));
+  if (!lesson) return { error: `No lesson found for "${lessonId}".` };
+  if (!lesson.id.startsWith('cf:')) {
+    return { lesson: lesson.title, people: [], relatedPages: [], note: 'This incident has no postmortem page yet, so there is no one to trace. Writing one would capture who knows about it.' };
+  }
+  if (!cloudId) return { lesson: lesson.title, people: [], relatedPages: [], note: 'Site context unavailable.' };
+  const res = await whoHasBeenHere(cloudId, lesson.sourceKey);
+  return { lesson: lesson.title, link: lesson.url, ...res };
 }

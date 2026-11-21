@@ -206,6 +206,19 @@ export async function createPage({ spaceKey, title, storage, parentId }) {
   }, `create page "${title}"`);
 }
 
+/** Replace a page's storage body (v2), bumping the version. */
+export async function updatePageBody(id, title, storage) {
+  const cur = await confluence('app', route`/wiki/api/v2/pages/${id}`, {}, 'get page version');
+  return confluence('app', route`/wiki/api/v2/pages/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      id, status: 'current', title,
+      body: { representation: 'storage', value: storage },
+      version: { number: (cur.version?.number || 1) + 1, message: 'Precedent: link follow-up decision' },
+    }),
+  }, `update page "${title}"`);
+}
+
 /** Adding labels has no v2 endpoint; the v1 label API is still supported. */
 export function addPageLabels(pageId, labels) {
   return confluence('app', route`/wiki/rest/api/content/${pageId}/label`, {

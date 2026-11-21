@@ -27,3 +27,12 @@ test('incident merges into its postmortem by shared INC reference', () => {
   assert.equal(merged[0].incidentKey, 'LOPS-9');
   assert.deepEqual(merged[0].components, ['checkout', 'redis-cache']);
 });
+
+test('postmortem "See also" decision links do not leak into guardrails', async () => {
+  const { INCIDENTS, renderPostmortemStorage } = await import('../src/data/demo-history.js');
+  const inc = INCIDENTS.find((i) => i.ref === 'INC-105');
+  const html = renderPostmortemStorage(inc, 'OPS-5');
+  assert.match(html, /ri:content-title="ADR-007/);
+  const lesson = lessonFromConfluencePage({ id: '9', title: 'Postmortem: INC-105', body: { storage: { value: html } }, labels: [{ name: 'postmortem' }] });
+  assert.deepEqual(lesson.guardrails, inc.guardrails);
+});

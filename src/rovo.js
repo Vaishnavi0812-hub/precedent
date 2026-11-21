@@ -2,7 +2,7 @@
  * Rovo agent actions. The agent reasons in natural language; these actions give
  * it grounded, deterministic access to the team's institutional memory.
  */
-import { checkText, checkIssue, applyGuardrail } from './services/precedent.js';
+import { checkText, checkIssue, applyGuardrail, peopleForLesson } from './services/precedent.js';
 import { listLessons } from './store.js';
 import { LEVELS } from './engine/match.js';
 
@@ -141,4 +141,27 @@ export const addGuardrail = wrap(async (payload) => {
   const exact = lesson?.guardrails.find((g) => g.toLowerCase().includes(guardrail.toLowerCase().slice(0, 40))) || guardrail;
   const out = await applyGuardrail(key, lesson?.id || 'rovo', exact);
   return { added: true, issue: key, guardrail: exact, subtask: out.subtaskKey, link: out.url, fromLesson: lesson?.title };
+});
+
+/** Teamwork Graph: who has been here before, and what else should I read? */
+export const whoKnows = wrap(async (payload, ctx) => {
+  const ref = String(payload.reference || '').trim();
+  if (!ref) return { error: 'Which incident or decision? e.g. INC-105.' };
+  const lessons = await listLessons();
+  const needle = ref.toUpperCase();
+  let lesson = lessons.find((l) => (l.title || '').toUpperCase().includes(needle) && l.id.startsWith('cf:'))
+    || lessons.find((l) => (l.title || '').toUpperCase().includes(needle));
+  if (!lesson) {
+    const [m] = await checkText({ text: ref, limit: 1, minConfidence: 0 });
+    lesson = m && lessons.find((l) => l.id === m.id);
+  }
+  if (!lesson) return { error: `No incident or decision found for "${ref}".` };
+  const cloudId = payload.context?.cloudId || ctx?.cloudId || ctx?.context?.cloudId;
+  const res = await peopleForLesson(lesson.id, cloudId);
+  return {
+    ...res,
+    howToUse: res.people?.length
+      ? 'These people are connected to this incident in Teamwork Graph. Suggest the user talks to them before shipping a similar change.'
+      : 'No human authors or contributors are recorded for this page in Teamwork Graph. Say so plainly; do not invent names.',
+  };
 });

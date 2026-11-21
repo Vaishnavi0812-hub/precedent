@@ -3,11 +3,12 @@
  */
 import ResolverModule from '@forge/resolver';
 import { Queue } from '@forge/events';
-import { checkIssue, applyGuardrail, dismiss, autoFlag } from './services/precedent.js';
+import { checkIssue, applyGuardrail, dismiss, autoFlag, peopleForLesson } from './services/precedent.js';
 import { syncAll, getLastSync, ingestPage, ingestIncident, isIncidentIssue } from './services/ingest.js';
 import { startSeedJob, runSeedSlice, getSeedProgress, failSeed } from './services/seed.js';
 import { getConfig, setConfig, getStats, listLessons, clearLessons } from './store.js';
 import { listProjects, getIssue } from './atlassian.js';
+import { probeGraph } from './services/graph.js';
 
 // @forge/resolver is CommonJS; under "type": "module" the default import is the
 // namespace object, so unwrap it to get the class.
@@ -24,6 +25,16 @@ resolver.define('getPrecedents', async ({ context }) => {
 
 resolver.define('applyGuardrail', async ({ payload, context }) => {
   return applyGuardrail(context.extension.issue.key, payload.lessonId, payload.guardrail);
+});
+
+resolver.define('getPeople', async ({ payload, context }) => {
+  try {
+    return await peopleForLesson(payload.lessonId, context.cloudId);
+  } catch (e) {
+    if (e?.name === 'NeedsAuthenticationError') throw e; // Forge shows the consent prompt
+    console.error('getPeople failed', e);
+    return { people: [], relatedPages: [], error: e.message };
+  }
 });
 
 resolver.define('dismiss', async ({ payload, context }) => {
@@ -61,6 +72,17 @@ resolver.define('startSeed', async ({ payload, context }) => {
 resolver.define('getSeedProgress', async () => getSeedProgress());
 
 resolver.define('syncNow', async () => syncAll());
+
+resolver.define('probeGraph', async () => {
+  try {
+    const summary = await probeGraph();
+    return { ok: true, found: summary.found.map((f) => f.name), missing: summary.missing, fields: summary.totalQueryFields };
+  } catch (e) {
+    if (e?.name === 'NeedsAuthenticationError') throw e; // let Forge show the consent prompt
+    console.error('probeGraph failed', e);
+    return { ok: false, error: e.message };
+  }
+});
 
 resolver.define('saveConfig', async ({ payload }) => setConfig(payload));
 
@@ -123,4 +145,5 @@ export {
   getLesson as rovoGetLesson,
   riskHotspots as rovoHotspots,
   addGuardrail as rovoAddGuardrail,
+  whoKnows as rovoWhoKnows,
 } from './rovo.js';
