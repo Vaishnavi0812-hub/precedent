@@ -56,6 +56,16 @@ modules:
         - risk-hotspots
         - add-guardrail
 
+  rovo:mcp:
+    - key: precedent-mcp
+      name: Precedent
+      tools:
+        - search-precedents
+        - check-issue
+        - get-lesson
+        - risk-hotspots
+        - add-guardrail
+
   action:
     - key: search-precedents
       name: Search precedents
