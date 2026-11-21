@@ -3,7 +3,7 @@ import ForgeReconciler, {
   Box, Stack, Inline, Text, Link, Lozenge, Button, SectionMessage,
   Spinner, Tag, TagGroup, EmptyState, Icon, Tooltip, xcss,
 } from '@forge/react';
-import { invoke, router } from '@forge/bridge';
+import { invoke, router, view } from '@forge/bridge';
 
 const card = xcss({
   borderColor: 'color.border',
@@ -64,7 +64,14 @@ function Guardrail({ text, applied, onApply, busy }) {
           </Inline>
         </Box>
         {applied ? (
-          <Lozenge appearance="success">Added</Lozenge>
+          <Inline space="space.075" alignBlock="center">
+            <Lozenge appearance="success">Added</Lozenge>
+            {applied.key ? (
+              <Link href={`/browse/${applied.key}`}>{applied.key}</Link>
+            ) : (
+              <Text size="small" color="color.text.subtle">as checklist comment</Text>
+            )}
+          </Inline>
         ) : (
           <Button spacing="compact" appearance="default" isDisabled={busy} onClick={onApply}>
             {busy ? 'Adding…' : 'Add'}
@@ -118,7 +125,7 @@ function PrecedentCard({ m, applied, onApply, onDismiss, busyKey }) {
               <Guardrail
                 key={g}
                 text={g}
-                applied={applied.some((a) => a.lessonId === m.id && a.guardrail === g)}
+                applied={applied.find((a) => a.lessonId === m.id && a.guardrail === g)}
                 busy={busyKey === `${m.id}|${g}`}
                 onApply={() => onApply(m, g)}
               />
@@ -158,6 +165,8 @@ function App() {
       const res = await invoke('applyGuardrail', { lessonId: m.id, guardrail });
       setToast(res.subtaskKey ? `Created sub-task ${res.subtaskKey}` : 'Added as a checklist comment');
       setData((d) => ({ ...d, applied: [...d.applied, { lessonId: m.id, guardrail, key: res.subtaskKey }] }));
+      // Refresh the Jira issue view so the new sub-task / comment appears immediately.
+      try { await view.refresh(); } catch (_) { /* not supported in every context */ }
     } catch (e) {
       setToast(`Could not add guardrail: ${e.message}`);
     } finally {
