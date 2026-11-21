@@ -1,14 +1,17 @@
 /**
  * Precedent — Forge entry points.
  */
-import Resolver from '@forge/resolver';
+import ResolverModule from '@forge/resolver';
 import { Queue } from '@forge/events';
 import { checkIssue, applyGuardrail, dismiss, autoFlag } from './services/precedent.js';
 import { syncAll, getLastSync, ingestPage, ingestIncident, isIncidentIssue } from './services/ingest.js';
-import { runSeed, getSeedProgress, resetSeedProgress } from './services/seed.js';
+import { startSeedJob, runSeedSlice, getSeedProgress, failSeed } from './services/seed.js';
 import { getConfig, setConfig, getStats, listLessons, clearLessons } from './store.js';
 import { listProjects, getIssue } from './atlassian.js';
 
+// @forge/resolver is CommonJS; under "type": "module" the default import is the
+// namespace object, so unwrap it to get the class.
+const Resolver = ResolverModule.default ?? ResolverModule;
 const jobs = new Queue({ key: 'precedent-jobs' });
 const resolver = new Resolver();
 
@@ -31,8 +34,9 @@ resolver.define('dismiss', async ({ payload, context }) => {
 /* ---------------- Admin page ---------------- */
 
 resolver.define('getAdminState', async () => {
-  const [config, lastSync, seed, stats, lessons, projects] = await Promise.all([
-    getConfig(), getLastSync(), getSeedProgress(), getStats(), listLessons(), listProjects().catch(() => []),
+  const projects = await listProjects('app').catch(() => []);
+  const [config, lastSync, seed, stats, lessons] = await Promise.all([
+    getConfig(), getLastSync(), getSeedProgress(), getStats(), listLessons(),
   ]);
   return {
     config, lastSync, seed, stats, projects,
@@ -43,9 +47,15 @@ resolver.define('getAdminState', async () => {
 });
 
 resolver.define('startSeed', async ({ payload, context }) => {
-  await resetSeedProgress(context.accountId);
-  await jobs.push({ body: { type: 'seed', incidentProjectKey: payload?.incidentProjectKey, workProjectKey: payload?.workProjectKey } });
-  return { ok: true };
+  // Fast path only: everything slow happens in short queued slices.
+  try {
+    await startSeedJob(jobs, { accountId: context.accountId, incidentProjectKey: payload?.incidentProjectKey, workProjectKey: payload?.workProjectKey });
+    return { ok: true };
+  } catch (e) {
+    console.error('startSeed failed', e);
+    await failSeed(e.message);
+    return { ok: false, error: e.message };
+  }
 });
 
 resolver.define('getSeedProgress', async () => getSeedProgress());
@@ -62,7 +72,7 @@ export const handler = resolver.getDefinitions();
 
 export async function jobConsumer(event) {
   const body = event.body || event.payload || {};
-  if (body.type === 'seed') return runSeed(body);
+  if (body.type === 'seed-step') return runSeedSlice(jobs);
   if (body.type === 'sync') return syncAll();
   console.warn('unknown job', JSON.stringify(body));
 }

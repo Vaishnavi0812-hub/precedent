@@ -4,6 +4,12 @@
  */
 import api, { route } from '@forge/api';
 
+/** The user hasn't granted the app permission to act as them yet. Must propagate
+ *  out of the resolver so Forge shows the "Allow access" consent prompt. */
+export function isAuthError(e) {
+  return e?.name === 'NeedsAuthenticationError' || e?.constructor?.name === 'NeedsAuthenticationError' || e?.message === 'Authentication Required';
+}
+
 const client = (as) => (as === 'user' ? api.asUser() : api.asApp());
 
 async function json(res, what) {
@@ -82,9 +88,17 @@ export function createIssue(fields) {
   return jira('app', route`/rest/api/3/issue`, { method: 'POST', body: JSON.stringify({ fields }) }, 'create issue');
 }
 
-export async function listProjects() {
-  const res = await jira('app', route`/rest/api/3/project/search?maxResults=100&expand=description`, {}, 'list projects');
-  return (res.values || []).map((p) => ({ id: p.id, key: p.key, name: p.name, type: p.projectTypeKey }));
+export async function listProjects(as = 'app') {
+  const res = await jira(as, route`/rest/api/3/project/search?maxResults=100&expand=description`, {}, 'list projects');
+  return (res.values || []).map((p) => ({ id: p.id, key: p.key, name: p.name, type: p.projectTypeKey, style: p.style }));
+}
+
+/** Create a company-managed project (supports components). Runs as the admin who clicked setup. */
+export function createProject({ key, name, type, template, leadAccountId, description }, as = 'app') {
+  return jira(as, route`/rest/api/3/project`, {
+    method: 'POST',
+    body: JSON.stringify({ key, name, projectTypeKey: type, projectTemplateKey: template, leadAccountId, description, assigneeType: 'UNASSIGNED' }),
+  }, `create project ${key}`);
 }
 
 export function myself(as = 'user') {
@@ -101,56 +115,98 @@ export async function confluence(as, r, init = {}, what = 'Confluence request') 
   return json(res, what);
 }
 
-/** CQL search returning pages with storage body and labels. */
-export async function searchPages(cql, { max = 200 } = {}) {
-  const pages = [];
-  let start = 0;
-  let base = '';
-  while (pages.length < max) {
-    const res = await confluence('app',
-      route`/wiki/rest/api/content/search?cql=${cql}&expand=body.storage,metadata.labels,version&limit=50&start=${start}`,
-      {}, 'search pages');
-    base = res._links?.base || base;
-    const results = res.results || [];
-    pages.push(...results.map((p) => ({ ...p, labels: p.metadata?.labels?.results || [] })));
-    if (results.length < 50) break;
-    start += 50;
-  }
-  return { pages, base };
+let wikiBase;
+/** e.g. https://site.atlassian.net/wiki */
+export async function confluenceBaseUrl() {
+  if (!wikiBase) wikiBase = `${await jiraBaseUrl()}/wiki`;
+  return wikiBase;
 }
 
-export function getPage(id) {
-  return confluence('app', route`/wiki/rest/api/content/${id}?expand=body.storage,metadata.labels,version,space`, {}, 'get page');
+/** Normalise a v2 page (+ labels) into the shape the extractor expects. */
+function normalizePage(page, labels) {
+  return {
+    id: page.id,
+    title: page.title,
+    spaceId: page.spaceId,
+    body: { storage: { value: page.body?.storage?.value || '' } },
+    labels: labels.map((l) => ({ name: l.name })),
+    _links: { webui: page._links?.webui },
+  };
+}
+
+async function pageLabels(id) {
+  const res = await confluence('app', route`/wiki/api/v2/pages/${id}/labels?limit=100`, {}, 'page labels');
+  return res.results || [];
+}
+
+/** Fetch one page (v2) with storage body and labels. */
+export async function getPage(id) {
+  const [page, labels] = await Promise.all([
+    confluence('app', route`/wiki/api/v2/pages/${id}?body-format=storage`, {}, 'get page'),
+    pageLabels(id),
+  ]);
+  return normalizePage(page, labels);
+}
+
+/** CQL search (v1 search API, which has no v2 equivalent), then hydrate pages via v2. */
+export async function searchPages(cql, { max = 200 } = {}) {
+  const ids = [];
+  let start = 0;
+  while (ids.length < max) {
+    const res = await confluence('app', route`/wiki/rest/api/search?cql=${cql}&limit=50&start=${start}`, {}, 'search pages');
+    const results = (res.results || []).filter((r) => r.content?.type === 'page');
+    ids.push(...results.map((r) => r.content.id));
+    if ((res.results || []).length < 50) break;
+    start += 50;
+  }
+  const pages = [];
+  for (let i = 0; i < ids.length; i += 6) {
+    const batch = await Promise.all(ids.slice(i, i + 6).map((id) => getPage(id).catch((e) => { console.warn(`page ${id}: ${e.message}`); return null; })));
+    pages.push(...batch.filter(Boolean));
+  }
+  return { pages, base: await confluenceBaseUrl() };
+}
+
+const spaceIds = new Map();
+export async function getSpaceId(key) {
+  if (spaceIds.has(key)) return spaceIds.get(key);
+  const res = await confluence('app', route`/wiki/api/v2/spaces?keys=${key}&limit=1`, {}, 'get space');
+  const id = res.results?.[0]?.id;
+  if (id) spaceIds.set(key, id);
+  return id;
 }
 
 export async function ensureSpace(key, name, description) {
-  try {
-    return await confluence('app', route`/wiki/rest/api/space/${key}`, {}, 'get space');
-  } catch (e) {
-    if (e.status !== 404) throw e;
-    return confluence('app', route`/wiki/rest/api/space`, {
-      method: 'POST',
-      body: JSON.stringify({ key, name, description: { plain: { value: description, representation: 'plain' } } }),
-    }, 'create space');
-  }
+  const existing = await getSpaceId(key);
+  if (existing) return { id: existing, key };
+  const created = await confluence('app', route`/wiki/api/v2/spaces`, {
+    method: 'POST',
+    body: JSON.stringify({ key, name, description: { value: description, representation: 'plain' } }),
+  }, 'create space');
+  spaceIds.set(key, created.id);
+  return created;
 }
 
 export async function findPageByTitle(spaceKey, title) {
-  const res = await confluence('app', route`/wiki/rest/api/content?spaceKey=${spaceKey}&title=${title}&expand=version`, {}, 'find page');
+  const spaceId = await getSpaceId(spaceKey);
+  if (!spaceId) return undefined;
+  const res = await confluence('app', route`/wiki/api/v2/pages?space-id=${spaceId}&title=${title}&limit=1`, {}, 'find page');
   return res.results?.[0];
 }
 
-export function createPage({ spaceKey, title, storage, parentId }) {
-  return confluence('app', route`/wiki/rest/api/content`, {
+export async function createPage({ spaceKey, title, storage, parentId }) {
+  const spaceId = await getSpaceId(spaceKey);
+  return confluence('app', route`/wiki/api/v2/pages`, {
     method: 'POST',
     body: JSON.stringify({
-      type: 'page', title, space: { key: spaceKey },
-      ...(parentId ? { ancestors: [{ id: parentId }] } : {}),
-      body: { storage: { value: storage, representation: 'storage' } },
+      spaceId, status: 'current', title,
+      ...(parentId ? { parentId } : {}),
+      body: { representation: 'storage', value: storage },
     }),
   }, `create page "${title}"`);
 }
 
+/** Adding labels has no v2 endpoint; the v1 label API is still supported. */
 export function addPageLabels(pageId, labels) {
   return confluence('app', route`/wiki/rest/api/content/${pageId}/label`, {
     method: 'POST', body: JSON.stringify(labels.map((name) => ({ prefix: 'global', name }))),

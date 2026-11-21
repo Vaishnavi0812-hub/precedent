@@ -59,7 +59,12 @@ function App() {
 
   const startSeed = async () => {
     setState((s) => ({ ...s, seed: { status: 'queued', done: 0, total: 1, log: ['Queued…'] } }));
-    await invoke('startSeed', { incidentProjectKey: incidentProject?.value, workProjectKey: workProject?.value });
+    try {
+      const res = await invoke('startSeed', { incidentProjectKey: incidentProject?.value, workProjectKey: workProject?.value });
+      if (res && res.ok === false) setState((s) => ({ ...s, seed: { status: 'error', error: res.error, log: [] } }));
+    } catch (e) {
+      setState((s) => ({ ...s, seed: { status: 'error', error: e.message || String(e), log: [] } }));
+    }
   };
 
   const syncNow = async () => {

@@ -162,7 +162,7 @@ export function lessonQuality(l) {
   return Number(q.toFixed(2));
 }
 
-export function lessonFromConfluencePage(page, siteUrl = '') {
+export function lessonFromConfluencePage(page, wikiBaseUrl = '') {
   const html = page.body?.storage?.value ?? page.body ?? '';
   const labels = (page.labels?.results || page.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
   const isDecision = labels.some((l) => /^(decision|adr|architecture-decision)$/i.test(l)) || /^ADR[-\s]?\d+/i.test(page.title || '');
@@ -172,7 +172,7 @@ export function lessonFromConfluencePage(page, siteUrl = '') {
     sourceType: isDecision ? 'decision' : 'postmortem',
     sourceKey: page.id,
     title: page.title,
-    url: webui ? `${siteUrl}/wiki${webui}` : undefined,
+    url: webui ? `${wikiBaseUrl}${webui}` : undefined,
     tags: labels.filter((l) => !/^(postmortem|post-mortem|decision|adr|pir)$/i.test(l)),
   });
 }

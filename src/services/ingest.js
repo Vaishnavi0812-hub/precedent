@@ -2,7 +2,7 @@
  * Ingestion: discover postmortems, decision records and resolved incidents,
  * turn them into lessons, and keep the store in sync.
  */
-import { searchPages, getPage, searchIssues, getIssue, jiraBaseUrl } from '../atlassian.js';
+import { searchPages, getPage, searchIssues, getIssue, jiraBaseUrl, confluenceBaseUrl } from '../atlassian.js';
 import { lessonFromConfluencePage, lessonFromIncidentIssue } from '../engine/extract.js';
 import { saveLessons, saveLesson, listLessons, deleteLesson, getConfig, bumpStat } from '../store.js';
 import { kvs } from '@forge/kvs';
@@ -86,11 +86,10 @@ export async function getLastSync() {
 export async function ingestPage(pageId) {
   const config = await getConfig();
   const page = await getPage(pageId);
-  const labels = (page.metadata?.labels?.results || []).map((l) => l.name.toLowerCase());
+  const labels = page.labels.map((l) => l.name.toLowerCase());
   const relevant = [...config.postmortemLabels, ...config.decisionLabels].some((l) => labels.includes(l));
   if (!relevant) return null;
-  const base = page._links?.base || '';
-  const lesson = lessonFromConfluencePage({ ...page, labels: page.metadata.labels.results }, base);
+  const lesson = lessonFromConfluencePage(page, await confluenceBaseUrl());
   await saveLesson(lesson);
   await bumpStat('lessonsLearned');
   return lesson;
