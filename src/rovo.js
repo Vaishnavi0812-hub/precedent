@@ -109,7 +109,9 @@ export const riskHotspots = wrap(async () => {
       if (isOutage(l)) e.outageMinutes += l.durationMin || 0;
       else e.degradedMinutes += l.durationMin || 0;
       if (l.severity === 'SEV1') e.sev1 += 1;
-      if (e.examples.length < 3) e.examples.push(l.title);
+      // Structured examples (with their own links) so the agent never pairs a
+      // title with the wrong incident.
+      if (e.examples.length < 3) e.examples.push({ title: l.title, link: l.url, severity: l.severity, minutes: l.durationMin, date: l.date });
       byComponent.set(c, e);
     }
     for (const t of l.tags || []) byTheme.set(t, (byTheme.get(t) || 0) + 1);
