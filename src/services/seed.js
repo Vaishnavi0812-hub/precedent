@@ -263,20 +263,27 @@ async function runTask(task, state) {
     case 'postmortem': {
       const inc = INCIDENTS.find((i) => i.ref === task.ref);
       const title = `Postmortem: ${inc.ref} — ${inc.title}`;
-      if (await findPageByTitle(state.spaceKey, title)) return null;
+      state.pageIds = state.pageIds || [];
+      const existing = await findPageByTitle(state.spaceKey, title);
+      if (existing) { state.pageIds.push(existing.id); return null; }
       const page = await createPage({ spaceKey: state.spaceKey, title, parentId: state.pmParentId, storage: renderPostmortemStorage(inc, state.incidentKeys[inc.ref]) });
       await addPageLabels(page.id, ['postmortem', ...inc.tags.map((t) => t.toLowerCase())]);
+      state.pageIds.push(page.id);
       return `Postmortem written: ${inc.ref}`;
     }
     case 'decision': {
       const adr = DECISIONS.find((d) => d.ref === task.ref);
-      if (await findPageByTitle(state.spaceKey, adr.title)) return null;
+      state.pageIds = state.pageIds || [];
+      const existing = await findPageByTitle(state.spaceKey, adr.title);
+      if (existing) { state.pageIds.push(existing.id); return null; }
       const page = await createPage({ spaceKey: state.spaceKey, title: adr.title, parentId: state.adrParentId, storage: renderDecisionStorage(adr) });
       await addPageLabels(page.id, ['decision', 'adr', ...adr.tags]);
+      state.pageIds.push(page.id);
       return `Decision recorded: ${adr.ref}`;
     }
     case 'learn': {
-      const summary = await syncAll();
+      // Learn from the pages we just wrote by id: search indexing can lag by minutes.
+      const summary = await syncAll({ extraPageIds: state.pageIds || [] });
       return `Learned ${summary.total} lessons (${summary.postmortems} postmortems, ${summary.decisions} decisions, ${summary.incidents} incidents)`;
     }
     case 'work-setup': {

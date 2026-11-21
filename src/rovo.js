@@ -98,11 +98,16 @@ export const riskHotspots = wrap(async () => {
   const lessons = (await listLessons()).filter((l) => l.sourceType !== 'decision');
   const byComponent = new Map();
   const byTheme = new Map();
+  // Only SEV1/SEV2 durations are customer-facing outages. Lower-severity durations
+  // (e.g. two days of wrong dashboards) are reported separately so they don't
+  // masquerade as downtime.
+  const isOutage = (l) => l.severity === 'SEV1' || l.severity === 'SEV2';
   for (const l of lessons) {
     for (const c of l.components || []) {
-      const e = byComponent.get(c) || { component: c, incidents: 0, outageMinutes: 0, sev1: 0, examples: [] };
+      const e = byComponent.get(c) || { component: c, incidents: 0, sev1: 0, outageMinutes: 0, degradedMinutes: 0, examples: [] };
       e.incidents += 1;
-      e.outageMinutes += l.durationMin || 0;
+      if (isOutage(l)) e.outageMinutes += l.durationMin || 0;
+      else e.degradedMinutes += l.durationMin || 0;
       if (l.severity === 'SEV1') e.sev1 += 1;
       if (e.examples.length < 3) e.examples.push(l.title);
       byComponent.set(c, e);
@@ -112,8 +117,10 @@ export const riskHotspots = wrap(async () => {
   const weak = lessons.filter((l) => (l.quality ?? 1) < 0.7).map((l) => ({ title: l.title, quality: l.quality, link: l.url }));
   return {
     incidentsAnalysed: lessons.length,
-    totalOutageMinutes: lessons.reduce((s, l) => s + (l.durationMin || 0), 0),
-    hotspots: [...byComponent.values()].sort((a, b) => b.incidents - a.incidents || b.outageMinutes - a.outageMinutes).slice(0, 6),
+    totalOutageMinutes: lessons.filter(isOutage).reduce((s, l) => s + (l.durationMin || 0), 0),
+    note: 'outageMinutes counts SEV1/SEV2 customer-facing outages only; degradedMinutes is lower-severity impact (e.g. bad data), not downtime.',
+    // Rank by severe incidents first, then real outage time, then frequency.
+    hotspots: [...byComponent.values()].sort((a, b) => b.sev1 - a.sev1 || b.outageMinutes - a.outageMinutes || b.incidents - a.incidents).slice(0, 6),
     recurringThemes: [...byTheme.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([theme, count]) => ({ theme, count })),
     postmortemsNeedingWork: weak,
   };

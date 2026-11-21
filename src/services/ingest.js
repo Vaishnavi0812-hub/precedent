@@ -9,9 +9,19 @@ import { kvs } from '@forge/kvs';
 
 const cqlList = (labels) => labels.map((l) => `"${l.replace(/"/g, '')}"`).join(',');
 
-export async function fetchConfluenceLessons(config) {
+/**
+ * @param extraPageIds pages known to be relevant (e.g. just created) that the
+ *   search index may not have caught up with yet. Fetched directly by id.
+ */
+export async function fetchConfluenceLessons(config, extraPageIds = []) {
   const labels = [...config.postmortemLabels, ...config.decisionLabels];
   const { pages, base } = await searchPages(`type=page AND label in (${cqlList(labels)})`);
+  const seen = new Set(pages.map((p) => String(p.id)));
+  const missing = extraPageIds.map(String).filter((id) => !seen.has(id));
+  for (let i = 0; i < missing.length; i += 6) {
+    const batch = await Promise.all(missing.slice(i, i + 6).map((id) => getPage(id).catch(() => null)));
+    pages.push(...batch.filter(Boolean));
+  }
   return pages.map((p) => lessonFromConfluencePage(p, base));
 }
 
@@ -61,17 +71,22 @@ export function mergeLessons(pageLessons, incidentLessons) {
 }
 
 /** Full resync. Returns a summary for the admin page. */
-export async function syncAll() {
+export async function syncAll({ extraPageIds = [] } = {}) {
   const started = Date.now();
   const config = await getConfig();
+  let confluenceOk = true;
+  let jiraOk = true;
   const [pageLessons, incidentLessons] = await Promise.all([
-    fetchConfluenceLessons(config).catch((e) => { console.error('confluence sync', e); return []; }),
-    fetchIncidentLessons(config).catch((e) => { console.error('incident sync', e); return []; }),
+    fetchConfluenceLessons(config, extraPageIds).catch((e) => { confluenceOk = false; console.error('confluence sync', e); return []; }),
+    fetchIncidentLessons(config).catch((e) => { jiraOk = false; console.error('incident sync', e); return []; }),
   ]);
   const lessons = mergeLessons(pageLessons, incidentLessons);
   const existing = await listLessons();
   const keep = new Set(lessons.map((l) => l.id));
-  for (const old of existing) if (!keep.has(old.id)) await deleteLesson(old.id);
+  // Only forget lessons whose source we actually read successfully: a failed
+  // search must never wipe the team's memory.
+  const sourceOk = (id) => (id.startsWith('cf:') ? confluenceOk : jiraOk);
+  for (const old of existing) if (!keep.has(old.id) && sourceOk(old.id)) await deleteLesson(old.id);
   await saveLessons(lessons);
   const summary = {
     at: new Date().toISOString(),
