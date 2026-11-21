@@ -84,17 +84,28 @@ export async function computeImpact() {
     }
   }
   const isOutage = (l) => l && (l.severity === 'SEV1' || l.severity === 'SEV2');
+  // Decisions carry no outage of their own, but most were born from one ("After INC-105, ...").
+  // Credit a decision with the incident that caused it.
+  const originOf = (l) => {
+    if (!l || l.sourceType !== 'decision') return null;
+    const ref = String(l.summary || '').match(/\b(?:INC|PIR)-\d+\b/i)?.[0]?.toUpperCase();
+    return ref ? lessons.find((x) => x.sourceType !== 'decision' && (x.title || '').toUpperCase().includes(ref)) : null;
+  };
   let minutesAtRisk = 0;
   let sev1Repeats = 0;
   const nearMisses = [];
   for (const e of issues.values()) {
-    const ls = [...e.lessons].map((id) => byId.get(id)).filter(Boolean);
-    const worst = ls.filter(isOutage).sort((a, b) => (b.durationMin || 0) - (a.durationMin || 0))[0];
+    const direct = [...e.lessons].map((id) => byId.get(id)).filter(Boolean);
+    const origins = direct.map(originOf).filter(Boolean);
+    const worst = [...direct, ...origins].filter(isOutage).sort((a, b) => (b.durationMin || 0) - (a.durationMin || 0))[0];
     if (worst) minutesAtRisk += worst.durationMin || 0;
-    if (ls.some((l) => l.severity === 'SEV1')) sev1Repeats += 1;
+    if ([...direct, ...origins].some((l) => l.severity === 'SEV1')) sev1Repeats += 1;
+    const shown = direct.find((l) => l === worst) || direct[0];
+    const via = worst && !direct.includes(worst) ? (worst.title.match(/\b(?:INC|PIR)-\d+\b/i)?.[0] || worst.title) : null;
     nearMisses.push({
       issueKey: e.issueKey, summary: e.summary, guarded: e.guarded,
-      precedent: (worst || ls[0])?.title, severity: (worst || ls[0])?.severity, minutes: worst?.durationMin || 0,
+      precedent: via ? `${shown?.title} (after ${via})` : shown?.title,
+      severity: worst?.severity || shown?.severity, minutes: worst?.durationMin || 0,
     });
   }
   const topLessons = Object.entries(hitsByLesson)

@@ -96,7 +96,6 @@ function App() {
   return (
     <Stack space="space.400">
       <Stack space="space.100">
-        <Heading size="xlarge">Precedent</Heading>
         <Text color="color.text.subtle">
           Precedent reads your postmortems, incidents and decision records, and warns your team when a new piece of work looks like something that has hurt you before.
         </Text>
@@ -107,7 +106,7 @@ function App() {
         <Stack space="space.200">
           <Inline space="space.100" alignBlock="center">
             <Heading size="medium">Impact</Heading>
-            <Lozenge appearance="success">Repeat incidents caught before shipping</Lozenge>
+            <Lozenge appearance="success">Caught before shipping</Lozenge>
           </Inline>
           {impact ? (
             <>
