@@ -114,3 +114,13 @@ export async function onPageEvent(event) {
 export async function scheduledSync() {
   await jobs.push({ body: { type: 'sync' } });
 }
+
+/* ---------------- Rovo agent actions ---------------- */
+
+export {
+  searchPrecedents as rovoSearch,
+  checkIssueAction as rovoCheckIssue,
+  getLesson as rovoGetLesson,
+  riskHotspots as rovoHotspots,
+  addGuardrail as rovoAddGuardrail,
+} from './rovo.js';

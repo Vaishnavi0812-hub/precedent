@@ -8,6 +8,115 @@ modules:
       title: Precedent
       icon: https://raw.githubusercontent.com/Vaishnavi0812-hub/precedent/main/assets/icon.svg
 
+  rovo:agent:
+    - key: precedent-agent
+      name: Precedent
+      description: Remembers every incident, postmortem and decision your team has made, and warns you before you repeat one.
+      icon: https://raw.githubusercontent.com/Vaishnavi0812-hub/precedent/main/assets/icon.svg
+      prompt: |
+        You are Precedent, the institutional memory of an engineering organisation.
+        You know every postmortem, resolved incident and architecture decision the team
+        has recorded in Confluence and Jira Service Management. Your job is to stop the
+        team from repeating mistakes it has already paid for.
+
+        How you work:
+        - When someone describes a change they plan to make, call search-precedents with
+          their description (and components/services if mentioned).
+        - When someone mentions a Jira issue key (like LUMEN-3), or you are opened on an
+          issue, call check-issue. If no key is given but you have issue context, use it.
+        - When someone asks about a specific incident or decision (INC-105, ADR-007, "the
+          retry storm"), call get-lesson.
+        - When someone asks where the organisation keeps getting hurt, what to invest in,
+          or which systems are fragile, call risk-hotspots.
+        - Only call add-guardrail when the user explicitly asks you to add a guardrail to an
+          issue. Confirm the exact guardrail text and issue key in your reply.
+
+        How you answer:
+        - Lead with the verdict in one line: "⚠️ Déjà vu", "Possibly related" or
+          "✅ No precedent found".
+        - For each relevant precedent: name it with its link, say when it happened, the
+          impact (outage minutes, customers or revenue affected), what changed and why it
+          went wrong, in two or three sentences.
+        - Then list the guardrails the team agreed on as a short checklist, and offer to
+          add them to the issue.
+        - Explain why it matched (the "matchedOn" terms) briefly, so people can trust it.
+        - Never invent incidents, numbers or guardrails. Only use what the actions return.
+          If nothing matches, say so plainly and suggest writing a postmortem if the change
+          does go wrong.
+        - Be direct and calm. You are a senior engineer who has seen this before, not an alarm.
+      conversationStarters:
+        - Has anything like this gone wrong before? I'm about to lower our cache TTL.
+        - Check LUMEN-2 for precedents
+        - Where do we keep getting hurt?
+        - What happened in INC-105 and what did we agree to change?
+      actions:
+        - search-precedents
+        - check-issue
+        - get-lesson
+        - risk-hotspots
+        - add-guardrail
+
+  action:
+    - key: search-precedents
+      name: Search precedents
+      function: rovo-search
+      actionVerb: GET
+      description: Search past incidents, postmortems and architecture decisions for anything resembling a planned change. Returns matches with impact, root cause and guardrails.
+      inputs:
+        change:
+          title: Planned change
+          type: string
+          required: true
+          description: A description of the change being planned, in the user's words.
+        components:
+          title: Components
+          type: string
+          required: false
+          description: Optional comma-separated services or components the change touches.
+    - key: check-issue
+      name: Check issue
+      function: rovo-check-issue
+      actionVerb: GET
+      description: Check a Jira issue (work item) against past incidents and decisions. Use when the user mentions an issue key or is viewing an issue.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: false
+          description: The Jira issue key, e.g. LUMEN-3. Optional when the agent is opened on an issue.
+    - key: get-lesson
+      name: Get lesson
+      function: rovo-get-lesson
+      actionVerb: GET
+      description: Get the full detail of one past incident, postmortem or decision by reference (e.g. INC-105, ADR-007) or by keywords.
+      inputs:
+        reference:
+          title: Reference
+          type: string
+          required: true
+          description: An incident or decision reference like INC-105 or ADR-007, or a few keywords.
+    - key: risk-hotspots
+      name: Risk hotspots
+      function: rovo-hotspots
+      actionVerb: GET
+      description: Summarise where the organisation keeps getting hurt - components with the most incidents and outage minutes, recurring themes, and postmortems that need improving.
+    - key: add-guardrail
+      name: Add guardrail
+      function: rovo-add-guardrail
+      actionVerb: CREATE
+      description: Add a guardrail from a past incident to a Jira issue as a sub-task. Only when the user explicitly asks.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: false
+          description: The Jira issue key to add the guardrail to. Optional when opened on an issue.
+        guardrail:
+          title: Guardrail
+          type: string
+          required: true
+          description: The guardrail text to add, as returned by a previous precedent check.
+
   jira:adminPage:
     - key: precedent-admin
       resource: admin
@@ -41,6 +150,16 @@ modules:
       function: job-consumer
 
   function:
+    - key: rovo-search
+      handler: index.rovoSearch
+    - key: rovo-check-issue
+      handler: index.rovoCheckIssue
+    - key: rovo-get-lesson
+      handler: index.rovoGetLesson
+    - key: rovo-hotspots
+      handler: index.rovoHotspots
+    - key: rovo-add-guardrail
+      handler: index.rovoAddGuardrail
     - key: resolver
       handler: index.handler
     - key: issue-events
