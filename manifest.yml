@@ -167,6 +167,16 @@ modules:
       render: native
       title: Precedent
 
+  # Same page, reachable from Jira's Apps menu so nobody has to dig through admin settings.
+  jira:globalPage:
+    - key: precedent-home
+      resource: admin
+      resolver:
+        function: resolver
+      render: native
+      title: Precedent
+      icon: https://raw.githubusercontent.com/Vaishnavi0812-hub/precedent/main/assets/icon.svg
+
   trigger:
     - key: precedent-issue-events
       function: issue-events
