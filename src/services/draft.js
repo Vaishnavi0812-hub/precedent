@@ -86,6 +86,13 @@ async function postmortemSpace() {
   return spaces.results?.[0]?.key || null;
 }
 
+/** "2 similar incidents and 1 decision" */
+export function describeSimilar(similar) {
+  const n = (count, word) => (count ? `${count} ${word}${count === 1 ? '' : 's'}` : null);
+  const decisions = similar.filter((m) => m.sourceType === 'decision').length;
+  return [n(similar.length - decisions, 'similar incident'), n(decisions, 'related decision')].filter(Boolean).join(' and ');
+}
+
 function adfLink(text, href) {
   return { type: 'text', text, marks: [{ type: 'link', attrs: { href } }] };
 }
@@ -136,7 +143,7 @@ export async function draftPostmortem(issueKey) {
   ];
   if (similar.length) {
     content.push(
-      { type: 'paragraph', content: [{ type: 'text', text: `⚠️ This has happened before (${similar.length === 1 ? '1 similar incident' : `${similar.length} similar incidents`}):`, marks: [{ type: 'strong' }] }] },
+      { type: 'paragraph', content: [{ type: 'text', text: `⚠️ This has happened before (${describeSimilar(similar)}):`, marks: [{ type: 'strong' }] }] },
       { type: 'bulletList', content: similar.map((m) => ({ type: 'listItem', content: [{ type: 'paragraph', content: [m.url ? adfLink(m.title, m.url) : { type: 'text', text: m.title }] }] })) },
     );
   }
