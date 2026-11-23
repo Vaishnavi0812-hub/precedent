@@ -86,6 +86,10 @@ function App() {
     const config = await invoke('saveConfig', { autoFlag: !state.config.autoFlag });
     setState((s) => ({ ...s, config }));
   };
+  const toggleSetting = (key) => async () => {
+    const config = await invoke('saveConfig', { [key]: state.config[key] === false });
+    setState((s) => ({ ...s, config }));
+  };
 
   if (error) return <SectionMessage appearance="error" title="Could not load Precedent settings"><Text>{error}</Text></SectionMessage>;
   if (!state) return <Spinner size="large" label="Loading" />;
@@ -191,7 +195,7 @@ function App() {
         <Stack space="space.200">
           <Heading size="medium">Your history</Heading>
           <Text>
-            {`Precedent learns automatically from Confluence pages labelled "${config.postmortemLabels.slice(0, 2).join('", "')}" (postmortems) or "${config.decisionLabels.slice(0, 2).join('", "')}" (decisions), and from resolved Jira Service Management incidents. New pages and resolved incidents are learned as soon as they appear.`}
+            {`Precedent finds your postmortems, incident reviews, RCAs and decision records (ADRs) on its own, by title and structure; no labelling needed. Pages labelled "${config.postmortemLabels.slice(0, 2).join('", "')}" or "${config.decisionLabels.slice(0, 2).join('", "')}" are always included. It also learns from resolved Jira Service Management incidents. New pages and resolved incidents are learned as soon as they appear.`}
           </Text>
           <Inline space="space.200" alignBlock="center" shouldWrap>
             <Button isDisabled={syncing} onClick={syncNow}>{syncing ? 'Re-reading…' : 'Re-read everything now'}</Button>
@@ -204,6 +208,14 @@ function App() {
           <Inline space="space.100" alignBlock="center">
             <Toggle id="autoflag" isChecked={config.autoFlag} onChange={toggleAutoFlag} />
             <Label labelFor="autoflag">Comment on new issues when there is a strong match</Label>
+          </Inline>
+          <Inline space="space.100" alignBlock="center">
+            <Toggle id="autodiscover" isChecked={config.autoDiscover !== false} onChange={toggleSetting('autoDiscover')} />
+            <Label labelFor="autodiscover">Find postmortems and ADRs automatically, even without labels</Label>
+          </Inline>
+          <Inline space="space.100" alignBlock="center">
+            <Toggle id="drafts" isChecked={config.draftPostmortems !== false} onChange={toggleSetting('draftPostmortems')} />
+            <Label labelFor="drafts">When an incident is resolved, draft its postmortem in Confluence and say if it has happened before</Label>
           </Inline>
         </Stack>
       </Box>

@@ -74,6 +74,8 @@ const DEFAULT_CONFIG = {
   decisionLabels: ['decision', 'adr', 'architecture-decision'],
   autoFlag: true,            // comment + label on high-confidence matches
   autoFlagMinLevel: 'high',
+  autoDiscover: true,        // learn from unlabelled pages that look like postmortems/ADRs
+  draftPostmortems: true,    // draft a structured postmortem when an incident is resolved
 };
 
 export async function getConfig() {

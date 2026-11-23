@@ -173,10 +173,29 @@ export function lessonQuality(l) {
   return Number(q.toFixed(2));
 }
 
+const POSTMORTEM_TITLE = /post[\s-]?mortem|incident\s+(review|report|retro(spective)?|analysis|write[\s-]?up)|root[\s-]cause|\bRCA\b|\bPIR\b|\bCOE\b|correction of errors?|outage\s+(review|report)|\bINC-\d+\b/i;
+const DECISION_TITLE = /^\s*ADR[\s:-]?\d+|architecture decision|decision record/i;
+
+/**
+ * Does this page look like a postmortem or decision record, labels or not?
+ * Real teams rarely label consistently, so Precedent recognises the page by its
+ * title and its structure (a root-cause section plus a trigger or follow-ups).
+ * @returns 'postmortem' | 'decision' | null
+ */
+export function classifyPage(page) {
+  const title = page.title || '';
+  const labels = (page.labels?.results || page.labels || []).map((l) => (typeof l === 'string' ? l : l.name).toLowerCase());
+  if (labels.some((l) => /^(decision|adr|architecture-decision)$/.test(l)) || DECISION_TITLE.test(title)) return 'decision';
+  if (labels.some((l) => /^(postmortem|post-mortem|pir|incident-review|rca)$/.test(l)) || POSTMORTEM_TITLE.test(title)) return 'postmortem';
+  const fields = new Set(storageToSections(page.body?.storage?.value ?? page.body ?? '').map((s) => (s.heading ? fieldForHeading(s.heading) : null)));
+  if (fields.has('rootCause') && (fields.has('trigger') || fields.has('guardrails'))) return 'postmortem';
+  return null;
+}
+
 export function lessonFromConfluencePage(page, wikiBaseUrl = '') {
   const html = page.body?.storage?.value ?? page.body ?? '';
   const labels = (page.labels?.results || page.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
-  const isDecision = labels.some((l) => /^(decision|adr|architecture-decision)$/i.test(l)) || /^ADR[-\s]?\d+/i.test(page.title || '');
+  const isDecision = labels.some((l) => /^(decision|adr|architecture-decision)$/i.test(l)) || DECISION_TITLE.test(page.title || '');
   const webui = page._links?.webui;
   return lessonFromSections(storageToSections(html), {
     id: `cf:${page.id}`,

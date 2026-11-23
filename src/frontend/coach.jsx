@@ -29,7 +29,13 @@ function App() {
           <ProgressBar value={data.quality} ariaLabel="Actionability" appearance={pct >= 85 ? 'success' : 'default'} />
           {!data.tracked ? (
             <Text size="small" color="color.text.subtle">
-              {`Precedent isn't learning from this page yet. Add the label "${data.suggestedLabel}" and it will start warning teams before they repeat this.`}
+              {data.looksLikePostmortem
+                ? 'This looks like a postmortem, but it doesn\'t yet say what changed, why it broke or what to do differently. Add those sections and Precedent will start warning teams before they repeat it.'
+                : `Precedent isn't learning from this page yet. Add the label "${data.suggestedLabel}" and it will start warning teams before they repeat this.`}
+            </Text>
+          ) : data.discovered ? (
+            <Text size="small" color="color.text.subtle">
+              {missing.length ? 'Precedent found this page on its own and is learning from it. Fill the gaps below for sharper warnings.' : 'Precedent found this page on its own and is learning from it.'}
             </Text>
           ) : (
             <Text size="small" color="color.text.subtle">

@@ -5,6 +5,7 @@ import ResolverModule from '@forge/resolver';
 import { Queue } from '@forge/events';
 import { checkIssue, applyGuardrail, dismiss, autoFlag, peopleForLesson } from './services/precedent.js';
 import { syncAll, getLastSync, ingestPage, ingestIncident, isIncidentIssue } from './services/ingest.js';
+import { draftPostmortem } from './services/draft.js';
 import { startSeedJob, runSeedSlice, getSeedProgress, failSeed } from './services/seed.js';
 import { getConfig, setConfig, getStats, listLessons, clearLessons } from './store.js';
 import { listProjects, getIssue } from './atlassian.js';
@@ -130,7 +131,10 @@ export async function onIssueEvent(event) {
     const issue = await getIssue(key);
     if (isIncidentIssue(issue)) {
       const resolved = issue.fields.status?.statusCategory?.key === 'done' || Boolean(issue.fields.resolutiondate);
-      if (resolved) await ingestIncident(key);
+      if (resolved) {
+        await ingestIncident(key);
+        await draftPostmortem(key).catch((e) => console.error(`draftPostmortem ${key}`, e.message));
+      }
       return;
     }
     const relevantUpdate = event.eventType === 'avi:jira:created:issue'

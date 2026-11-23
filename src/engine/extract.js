@@ -48,6 +48,8 @@ export function htmlToText(html) {
   return decodeEntities(
     String(html || '')
       .replace(/<ac:structured-macro[^>]*ac:name="(?:toc|children|jira)"[\s\S]*?<\/ac:structured-macro>/g, ' ')
+      // Template prompts ("What change set this off?") are not content.
+      .replace(/<ac:placeholder[^>]*>[\s\S]*?<\/ac:placeholder>/g, ' ')
       .replace(/<(br|\/p|\/li|\/tr|\/h[1-6])\s*\/?>/gi, '\n')
       .replace(/<li[^>]*>/gi, '\n• ')
       .replace(/<[^>]+>/g, ' ')
@@ -127,7 +129,7 @@ export function parseMeta(text) {
     meta.durationMin = Math.round((h ? parseFloat(h) * 60 : 0) + (mins ? parseInt(mins, 10) : 0)) || undefined;
   }
   meta.date = grab(/\b(?:date|occurred|incident date)\s*[:=]\s*(\d{4}-\d{2}-\d{2})/i);
-  meta.incidentKey = grab(/\b(?:incident|jira|ticket)\s*[:=]\s*([A-Z][A-Z0-9]+-\d+)/);
+  meta.incidentKey = grab(/\b(?:[Ii]ncident|[Jj]ira|[Tt]icket)(?:\s+key)?\s*[:=]\s*([A-Z][A-Z0-9]+-\d+)/);
   return meta;
 }
 
@@ -173,10 +175,29 @@ export function lessonQuality(l) {
   return Number(q.toFixed(2));
 }
 
+const POSTMORTEM_TITLE = /post[\s-]?mortem|incident\s+(review|report|retro(spective)?|analysis|write[\s-]?up)|root[\s-]cause|\bRCA\b|\bPIR\b|\bCOE\b|correction of errors?|outage\s+(review|report)|\bINC-\d+\b/i;
+const DECISION_TITLE = /^\s*ADR[\s:-]?\d+|architecture decision|decision record/i;
+
+/**
+ * Does this page look like a postmortem or decision record, labels or not?
+ * Real teams rarely label consistently, so Precedent recognises the page by its
+ * title and its structure (a root-cause section plus a trigger or follow-ups).
+ * @returns 'postmortem' | 'decision' | null
+ */
+export function classifyPage(page) {
+  const title = page.title || '';
+  const labels = (page.labels?.results || page.labels || []).map((l) => (typeof l === 'string' ? l : l.name).toLowerCase());
+  if (labels.some((l) => /^(decision|adr|architecture-decision)$/.test(l)) || DECISION_TITLE.test(title)) return 'decision';
+  if (labels.some((l) => /^(postmortem|post-mortem|pir|incident-review|rca)$/.test(l)) || POSTMORTEM_TITLE.test(title)) return 'postmortem';
+  const fields = new Set(storageToSections(page.body?.storage?.value ?? page.body ?? '').map((s) => (s.heading ? fieldForHeading(s.heading) : null)));
+  if (fields.has('rootCause') && (fields.has('trigger') || fields.has('guardrails'))) return 'postmortem';
+  return null;
+}
+
 export function lessonFromConfluencePage(page, wikiBaseUrl = '') {
   const html = page.body?.storage?.value ?? page.body ?? '';
   const labels = (page.labels?.results || page.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
-  const isDecision = labels.some((l) => /^(decision|adr|architecture-decision)$/i.test(l)) || /^ADR[-\s]?\d+/i.test(page.title || '');
+  const isDecision = labels.some((l) => /^(decision|adr|architecture-decision)$/i.test(l)) || DECISION_TITLE.test(page.title || '');
   const webui = page._links?.webui;
   return lessonFromSections(storageToSections(html), {
     id: `cf:${page.id}`,

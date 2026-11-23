@@ -8,7 +8,7 @@
  */
 import { fetch } from '@forge/api';
 import { kvs } from '@forge/kvs';
-import { lessonFromConfluencePage } from './engine/extract.js';
+import { lessonFromConfluencePage, classifyPage } from './engine/extract.js';
 
 const CONFIG_KEY = 'confluence:config';
 const TOKEN_KEY = 'confluence:token';
@@ -55,9 +55,12 @@ export async function syncLessons() {
   const started = Date.now();
   const { labels } = await getConfig();
   const { base } = await authHeader();
-  const cql = `type=page AND label in (${labels.map((l) => `"${l}"`).join(',')})`;
+  // Labelled pages, plus pages that look like postmortems/ADRs by title (most teams don't label).
+  const discover = ['postmortem', 'post-mortem', 'incident review', 'incident report', 'root cause', 'RCA', 'PIR', 'ADR', 'architecture decision', 'decision record']
+    .map((t) => `title ~ "${t}"`).join(' OR ');
+  const cql = `type=page AND (label in (${labels.map((l) => `"${l}"`).join(',')}) OR ${discover})`;
   const ids = [];
-  for (let start = 0; start < 500; start += 50) {
+  for (let start = 0; start < 300; start += 50) {
     const res = await get(`/wiki/rest/api/search?cql=${encodeURIComponent(cql)}&limit=50&start=${start}`);
     const results = res.results || [];
     ids.push(...results.filter((r) => r.content?.type === 'page').map((r) => r.content.id));
@@ -71,13 +74,18 @@ export async function syncLessons() {
           get(`/wiki/api/v2/pages/${id}?body-format=storage`),
           get(`/wiki/api/v2/pages/${id}/labels?limit=100`),
         ]);
-        return lessonFromConfluencePage({
+        const p = {
           id: page.id,
           title: page.title,
           body: { storage: { value: page.body?.storage?.value || '' } },
           labels: (lbl.results || []).map((l) => ({ name: l.name })),
           _links: { webui: page._links?.webui },
-        }, `${base}/wiki`);
+        };
+        const labelled = p.labels.some((l) => labels.includes(l.name.toLowerCase()));
+        if (!labelled && !classifyPage(p)) return null;
+        const lesson = lessonFromConfluencePage(p, `${base}/wiki`);
+        if (!labelled && !(lesson.trigger || lesson.rootCause || lesson.guardrails.length)) return null;
+        return lesson;
       } catch (e) {
         console.warn(`page ${id}: ${e.message}`);
         return null;

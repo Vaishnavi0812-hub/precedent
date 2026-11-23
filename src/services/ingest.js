@@ -3,7 +3,7 @@
  * turn them into lessons, and keep the store in sync.
  */
 import { searchPages, getPage, searchIssues, getIssue, jiraBaseUrl, confluenceBaseUrl } from '../atlassian.js';
-import { lessonFromConfluencePage, lessonFromIncidentIssue } from '../engine/extract.js';
+import { lessonFromConfluencePage, lessonFromIncidentIssue, classifyPage } from '../engine/extract.js';
 import { saveLessons, saveLesson, listLessons, deleteLesson, getConfig, bumpStat } from '../store.js';
 import { kvs } from '@forge/kvs';
 
@@ -13,16 +13,44 @@ const cqlList = (labels) => labels.map((l) => `"${l.replace(/"/g, '')}"`).join('
  * @param extraPageIds pages known to be relevant (e.g. just created) that the
  *   search index may not have caught up with yet. Fetched directly by id.
  */
+/** Title phrases that usually mean "postmortem" or "decision record". */
+const DISCOVERY_TERMS = ['postmortem', 'post-mortem', 'incident review', 'incident report', 'root cause', 'RCA', 'PIR', 'ADR', 'architecture decision', 'decision record'];
+
+const isLabelled = (page, config) => {
+  const labels = (page.labels || []).map((l) => (l.name || l).toLowerCase());
+  return [...config.postmortemLabels, ...config.decisionLabels].some((l) => labels.includes(l));
+};
+
+/**
+ * Turn a page into a lesson if Precedent should learn from it: either it carries
+ * a postmortem/decision label, or (auto-discovery) it looks like one and has
+ * enough substance to warn anyone. Returns null otherwise.
+ */
+export function lessonIfLearnable(page, config, base) {
+  const labelled = isLabelled(page, config);
+  if (!labelled && (config.autoDiscover === false || !classifyPage(page))) return null;
+  const lesson = lessonFromConfluencePage(page, base);
+  if (labelled) return lesson;
+  // Unlabelled pages must say at least what changed, why it broke or what to do differently.
+  if (!(lesson.trigger || lesson.rootCause || lesson.guardrails.length)) return null;
+  return { ...lesson, discovered: true };
+}
+
+/**
+ * @param extraPageIds pages known to be relevant (e.g. just created) that the
+ *   search index may not have caught up with yet. Fetched directly by id.
+ */
 export async function fetchConfluenceLessons(config, extraPageIds = []) {
   const labels = [...config.postmortemLabels, ...config.decisionLabels];
-  const { pages, base } = await searchPages(`type=page AND label in (${cqlList(labels)})`);
+  const discover = config.autoDiscover === false ? '' : ` OR ${DISCOVERY_TERMS.map((t) => `title ~ "${t}"`).join(' OR ')}`;
+  const { pages, base } = await searchPages(`type=page AND (label in (${cqlList(labels)})${discover})`, { max: 150 });
   const seen = new Set(pages.map((p) => String(p.id)));
   const missing = extraPageIds.map(String).filter((id) => !seen.has(id));
   for (let i = 0; i < missing.length; i += 6) {
     const batch = await Promise.all(missing.slice(i, i + 6).map((id) => getPage(id).catch(() => null)));
     pages.push(...batch.filter(Boolean));
   }
-  return pages.map((p) => lessonFromConfluencePage(p, base));
+  return pages.map((p) => lessonIfLearnable(p, config, base)).filter(Boolean);
 }
 
 export async function fetchIncidentLessons(config) {
@@ -109,10 +137,8 @@ export async function getLastSync() {
 export async function ingestPage(pageId) {
   const config = await getConfig();
   const page = await getPage(pageId);
-  const labels = page.labels.map((l) => l.name.toLowerCase());
-  const relevant = [...config.postmortemLabels, ...config.decisionLabels].some((l) => labels.includes(l));
-  if (!relevant) return null;
-  const lesson = lessonFromConfluencePage(page, await confluenceBaseUrl());
+  const lesson = lessonIfLearnable(page, config, await confluenceBaseUrl());
+  if (!lesson) return null;
   await saveLesson(lesson);
   await bumpStat('lessonsLearned');
   return lesson;

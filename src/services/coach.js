@@ -7,7 +7,8 @@
  * changes the page has already protected.
  */
 import { getPage, confluenceBaseUrl } from '../atlassian.js';
-import { lessonFromConfluencePage } from '../engine/extract.js';
+import { lessonFromConfluencePage, classifyPage } from '../engine/extract.js';
+import { lessonIfLearnable } from './ingest.js';
 import { listLessons, getHits, getAllHits, getConfig, saveLesson } from '../store.js';
 
 const CHECKS = [
@@ -42,12 +43,19 @@ function present(lesson, hits) {
 export async function coachPage(pageId) {
   const config = await getConfig();
   const page = await getPage(pageId);
-  const labels = page.labels.map((l) => l.name.toLowerCase());
-  const tracked = [...config.postmortemLabels, ...config.decisionLabels].some((l) => labels.includes(l));
-  const lesson = lessonFromConfluencePage(page, await confluenceBaseUrl());
+  const base = await confluenceBaseUrl();
+  const learnable = lessonIfLearnable(page, config, base);
+  const tracked = Boolean(learnable);
+  const lesson = learnable || lessonFromConfluencePage(page, base);
   if (tracked) await saveLesson(lesson); // keep the stored lesson fresh when someone looks at the page
   const hits = await getHits(lesson.id);
-  return { tracked, suggestedLabel: lesson.sourceType === 'decision' ? 'decision' : 'postmortem', ...present(lesson, hits) };
+  return {
+    tracked,
+    discovered: Boolean(learnable?.discovered),
+    looksLikePostmortem: Boolean(classifyPage(page)),
+    suggestedLabel: lesson.sourceType === 'decision' ? 'decision' : 'postmortem',
+    ...present(lesson, hits),
+  };
 }
 
 /** Short byline title, e.g. "Precedent · 85% actionable · protected 3". */
