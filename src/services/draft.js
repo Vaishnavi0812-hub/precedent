@@ -143,7 +143,7 @@ export async function draftPostmortem(issueKey) {
   ];
   if (similar.length) {
     content.push(
-      { type: 'paragraph', content: [{ type: 'text', text: `⚠️ This has happened before (${describeSimilar(similar)}):`, marks: [{ type: 'strong' }] }] },
+      { type: 'paragraph', content: [{ type: 'text', text: `This has happened before (${describeSimilar(similar)}):`, marks: [{ type: 'strong' }] }] },
       { type: 'bulletList', content: similar.map((m) => ({ type: 'listItem', content: [{ type: 'paragraph', content: [m.url ? adfLink(m.title, m.url) : { type: 'text', text: m.title }] }] })) },
     );
   }

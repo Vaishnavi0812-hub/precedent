@@ -176,7 +176,7 @@ export function flagCommentAdf(matches) {
     {
       type: 'panel', attrs: { panelType: 'warning' },
       content: [
-        { type: 'paragraph', content: [{ type: 'text', text: '⚠️ Precedent: this change looks like something that has hurt us before.', marks: [{ type: 'strong' }] }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'Precedent: this change looks like something that has hurt us before.', marks: [{ type: 'strong' }] }] },
         { type: 'bulletList', content: items },
         para('Open the Precedent panel on this issue to review what went wrong and add the guardrails.'),
       ],
