@@ -1,59 +1,121 @@
 # Precedent
 
-**Your team already knows how this breaks. Precedent makes sure it remembers.**
+**Your team already paid for this lesson once. Precedent makes sure you don't pay twice.**
 
-Precedent is an Atlassian Forge app built for Codegeist 2026. It reads your postmortems, incidents and architecture decisions, and warns your team when a new piece of work looks like something that has hurt you before. It flags the risk at the moment of change, before the code is written, and turns the lesson into a guardrail with one click.
+Precedent is an Atlassian Forge app, built for Codegeist 2026, that turns your incident history into a safety net. It reads your postmortems, incidents and architecture decisions. When someone plans a change that resembles something that has hurt you before, it warns them in Jira, in Rovo and on the Bitbucket pull request, before the change ships. The guardrails your team already agreed on become one click away.
 
-> "Lower product catalog cache TTL to 30s" → ⚠️ *Déjà vu: INC-101 caused a 47 min checkout outage after exactly this change. Root cause: cache stampede. Guardrails: staggered rollout with jitter, cache warm-up, load-test the origin first.* → **[Add]**
+> **LUMEN-15** "Lower product catalog cache TTL to 30s so price changes show up faster"
+> ⚠️ **Déjà vu.** INC-101 caused a 47 min checkout outage in Mar 2026 after exactly this change (cache stampede, ~$310k lost).
+> Guardrails: roll TTL changes out gradually with jitter · warm the cache first · load-test the origin at 3× peak → **[Add]** creates the sub-task.
 
-## Why
+---
 
-Teams write careful postmortems and then lose them. Months later, someone makes the same change in the same way and causes the same outage. The lesson existed. It just wasn't in front of the person making the change. Precedent closes that gap.
+## The problem
+
+Teams write careful, blameless postmortems, and then nobody reads them again. Months later, someone lowers a cache TTL, raises a retry count or drops a feature flag, and the same outage happens again. The lesson existed. It just wasn't in front of the person making the change, at the moment they made it.
+
+Atlassian's tools help you **write** the postmortem: Jira Service Management post-incident reviews, Confluence templates, Rovo search. They all wait for someone to ask. Nobody asks "has this hurt us before?" before shipping a change that looks harmless. **Precedent asks for them.**
 
 ## What it does
 
-| Capability | Where |
-|---|---|
-| **Déjà vu panel**: past incidents and decisions that resemble this change, with what went wrong, impact, and the agreed guardrails | Jira issue panel |
-| **One-click guardrails**: turn a lesson into a sub-task, or a checklist comment if sub-tasks aren't available | Jira issue panel |
-| **Auto-flag**: a single warning comment when a newly created issue strongly matches a past incident | Jira trigger |
-| **Learning loop**: new postmortems and decision pages, and resolved JSM incidents, are learned automatically | Confluence and Jira triggers, hourly sync |
-| **Lesson library and quality score**: how actionable each postmortem is | Jira admin page |
-| **One-click demo history**: realistic incident history for a fictional company, so it works on a fresh site | Jira admin page |
-| **Rovo agent, MCP server, Bitbucket PR checks, Teamwork Graph** | *in progress* |
+| | Where | What happens |
+|---|---|---|
+| **Déjà vu panel** | Jira issue | Past incidents and decisions that resemble this work: what went wrong, what it cost, and the guardrails agreed afterwards. The panel also shows why each match was made. |
+| **One-click guardrails** | Jira issue | Each guardrail becomes a tracked sub-task (or a checklist comment) on the new work. |
+| **Auto-flag** | Jira | New issues that strongly resemble a past incident get one warning comment, without anyone opening the panel. |
+| **Repeat-incident check** | Bitbucket PR | A PR panel names the incident the diff resembles. A merge check fails until the author acknowledges it (`Precedent-Ack: INC-105`). It blocks merges on Premium workspaces and warns on other plans. |
+| **Rovo agent "Precedent"** | Rovo chat | "Has this gone wrong before?", "Where do we keep getting hurt?", "Who has been here before?", "Add the guardrail". Six actions, answers backed by the incident history. |
+| **MCP server** | Any MCP client | The same six tools, available to coding agents in the IDE. |
+| **Who has been here before?** | Jira and Rovo | Uses **Teamwork Graph** to trace a postmortem to the people who wrote and edited it, their teams, and linked decisions. You know who to ask. |
+| **Postmortem drafts** | JSM → Confluence | When an incident is resolved, Precedent drafts the postmortem in Confluence with the sections it learns from. It also tells the incident if *this has happened before*. |
+| **Postmortem quality coach** | Confluence byline | Scores every postmortem and decision record for actionability, says what's missing, and shows how many later changes the page has already protected. |
+| **Finds your history without labels** | Confluence | Recognises postmortems, RCAs, incident reviews and ADRs by title and structure. No re-labelling project needed. |
+| **Impact dashboard** | Jira (Apps → Precedent) | Near-misses caught, outage minutes those same mistakes cost last time, would-be SEV1 repeats, guardrails adopted, and the weakest postmortems. |
 
-## How matching works
+## Try it in 5 minutes (judges start here)
 
-Precedent uses deterministic retrieval, not a paid LLM call on every page view. That makes it fast, free to run, and consistent: the same change always gets the same answer.
+1. **Install** Precedent on your site (Jira **and** Confluence): `INSTALL_LINK_MAIN`
+2. In Jira, open **Apps → Precedent** (or *Settings → Apps → Precedent*) and click **Load demo history**. In about two minutes it creates two years of history for *Lumen Market*, a fictional online store:
+   - 14 incidents with blameless postmortems
+   - 4 architecture decisions
+   - 6 upcoming work items, five of which quietly repeat a past mistake
 
-1. **Extraction**: postmortems and ADRs are split by heading (Trigger, Root cause, Impact, Guardrails, Components and common aliases, including Atlassian's postmortem template). Incidents are parsed from ADF.
-2. **Indexing**: field-weighted BM25. Triggers and components weigh most, because they describe *the kind of change* that caused the incident. A domain synonym layer bridges vocabulary ("redis TTL" ≈ "cache expiry", "pool" ≈ "connection pool").
-3. **Scoring**: confidence blends BM25 strength, query coverage and component overlap, then maps to a level: strong, possible or weak. Single-word coincidences are suppressed.
-4. **Explainability**: every match shows the terms and components that triggered it.
+   The Jira projects and Confluence space are created for you. Sites without Jira Service Management store the incidents in a Jira project instead.
+3. Open the work item it points you to (e.g. *"Lower product catalog cache TTL…"*):
+   - Precedent has already commented on it.
+   - Open the **Precedent** panel (the Apps button under the issue title) and click **Add** on a guardrail.
+4. In Confluence, open any postmortem in the **Lumen Market Engineering** space and click the **Precedent** byline.
+5. Back in **Apps → Precedent**, look at the impact dashboard.
+6. *With Rovo enabled:* open Rovo chat, pick the **Precedent** agent and ask *"Where do we keep getting hurt?"* or *"I'm about to add retries to the shipping client. Has this gone wrong before?"*
+7. *Bitbucket (optional):*
+   1. Install the companion app on a workspace: `INSTALL_LINK_BITBUCKET`
+   2. Open *Workspace settings → Precedent*, enter the site URL, an email and an [API token](https://id.atlassian.com/manage-profile/security/api-tokens), then click **Save and sync**.
+   3. Open a PR that touches `services/payment-gateway-client/config/retries.yaml`.
+
+## How it works
+
+```
+ Jira Service Management        Confluence                      Jira               Bitbucket
+ resolved incidents ──┐   postmortems · RCAs · ADRs ──┐                                  
+                      ▼                               ▼                                  
+              ┌────────────────────────────────────────────┐                             
+              │  Extraction → lessons                       │   trigger · root cause ·    
+              │  (heading-aware, ADF + storage format)      │   guardrails · components   
+              ├────────────────────────────────────────────┤                             
+              │  Field-weighted BM25 + synonyms + component │                             
+              │  overlap → confidence (strong/possible)     │                             
+              └────────────────────────────────────────────┘                             
+                 │            │             │            │              │                
+          issue panel    auto-flag     Rovo agent    MCP tools    PR panel + merge check 
+                 │                                                                       
+          guardrail sub-task ─► impact record ─► dashboard + "protected N" on the page   
+```
+
+- **Deterministic and free to run.** Matching uses field-weighted BM25, not an LLM call per page view. The same change always gets the same answer, in milliseconds, at no per-check cost. Reasoning and conversation go through **Rovo**, which is included with Atlassian Cloud.
+- **Explainable.** Every match shows the terms and components it matched on. Single-word coincidences are suppressed.
+- **Triggers weigh most.** Postmortems are split by heading (Trigger, Root cause, Impact, Guardrails, Affected components, plus common aliases and Atlassian's template). The *kind of change* that caused an incident is what predicts the next one.
+- **Runs on Atlassian.** The main app has no external egress and no remote back end, so it is eligible for the *Runs on Atlassian* programme. All data stays in Forge storage and on your own Confluence pages.
+- **A closed loop:**
+  - An incident is resolved, and Precedent drafts the postmortem.
+  - The team fills it in, and Precedent learns from it within minutes.
+  - Look-alike work gets warned, and the guardrails become sub-tasks.
+  - The page shows that it *protected N changes*.
+  - The dashboard shows what it was worth.
+
+### Engineering notes
+
+- **Shared impact across products.** Forge keeps separate storage for an app's Jira and Confluence installs. Precedent therefore publishes each page's impact as a Confluence **page property**, so the Confluence coach can show what the Jira side caught.
+- **Resumable demo seeding.** Demo seeding runs as resumable 15-second slices on a Forge queue, so it can't hit function timeouts on slow sites. It's idempotent, so you can run it again safely.
+- **Bitbucket companion app.** Bitbucket modules can't share an app with site-scoped products. That's why the Bitbucket integration is a small companion app (`/bitbucket`) that reuses the same engine (`scripts/sync-engine.mjs`).
+- **Teamwork Graph.** Queries use curated graph fields (`confluencePageCreator/Owners/Contributors`, `atlassianUserInTeams`, `confluencePageLinkedConfluencePages`).
+
+## Requirements and limits
+
+- Jira Cloud and Confluence Cloud on the same site. Jira Service Management is optional.
+- Rovo agent and Teamwork Graph features need a site with Rovo.
+- The Bitbucket merge check *blocks* merges only on Bitbucket Premium (custom merge check enforcement). On other plans it reports pass or fail without blocking.
+- Matching is lexical with a domain synonym layer. It catches "the same kind of change", not arbitrary paraphrases. Rovo covers open-ended questions.
 
 ## Develop
 
 ```bash
 npm install
-npm test                 # engine unit tests (demo scenarios included)
-forge register           # first time only
-forge deploy
-forge install            # pick your Jira site; also install on Confluence
+npm test                         # 25 tests: engine, extraction, discovery, drafts, Bitbucket
+forge deploy -e development
+forge install -e development     # Jira, then again for Confluence
+cd bitbucket && npm install && forge deploy -e development
+node scripts/sync-engine.mjs     # after changing src/engine, re-vendor it into /bitbucket
 ```
-
-Then go to **Jira settings → Apps → Precedent** and click **Load demo history**.
-
-## Project layout
 
 ```
 src/
-  engine/       tokenize, extract (postmortem/ADF parsing), match (BM25 + confidence)
-  services/     precedent (check/apply/auto-flag), ingest (sync + learning loop), seed (demo)
-  data/         demo history: 14 incidents, 4 ADRs, 6 near-miss work items
-  frontend/     UI Kit issue panel and admin page
-  atlassian.js  Jira/Confluence REST helpers
-  store.js      Forge KVS persistence
-test/           node:test suite
+  engine/      tokenize · extract (storage/ADF → lessons, page classification) · match (BM25 + confidence)
+  services/    precedent (check, guardrails, auto-flag) · ingest (sync, discovery, quick sync)
+               draft (postmortem drafts) · coach (quality + impact) · graph (Teamwork Graph) · seed (demo)
+  frontend/    UI Kit: issue panel · admin/impact page · Confluence coach
+  rovo.js      Rovo agent / MCP actions
+bitbucket/     companion app: PR panel, merge check, workspace settings
+test/          node:test suites
 ```
 
 ## License

@@ -52,7 +52,7 @@ modules:
         - Be direct and calm. You are a senior engineer who has seen this before, not an alarm.
       conversationStarters:
         - Has anything like this gone wrong before? I'm about to lower our cache TTL.
-        - Check LUMEN-2 for precedents
+        - Does the issue I'm looking at repeat a past incident?
         - Where do we keep getting hurt?
         - What happened in INC-105 and what did we agree to change?
       actions:
