@@ -57,6 +57,12 @@ export const handler = resolver.getDefinitions();
  * acknowledged it. Configured as "Required" it blocks; otherwise it is advisory.
  */
 export async function mergeCheck(event) {
+  const result = await runMergeCheck(event);
+  console.log('PRECEDENT_MERGE_CHECK', JSON.stringify({ trigger: event?.trigger?.type, pr: event?.pullrequest?.id, success: result.success, message: result.message }));
+  return result;
+}
+
+async function runMergeCheck(event) {
   try {
     const workspace = event.workspace?.uuid;
     const repo = event.repository?.uuid;
