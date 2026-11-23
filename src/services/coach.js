@@ -18,8 +18,14 @@ const CHECKS = [
   { field: 'components', label: 'Where it happened (affected components)', heading: 'Affected components', why: 'Component overlap is the strongest matching signal.' },
 ];
 
+const DECISION_CHECKS = [
+  { field: 'summary', label: 'Why we decided (context)', heading: 'Context', why: 'Shown to engineers so the rule makes sense when it stops them.' },
+  { field: 'guardrails', label: 'The rule (decision)', heading: 'Decision', why: 'Turned into a one-click sub-task on future work it applies to.' },
+  { field: 'components', label: 'Where it applies (affected components)', heading: 'Affected components', why: 'Component overlap is the strongest matching signal.' },
+];
+
 function present(lesson, impact) {
-  const checks = CHECKS.map((c) => {
+  const checks = (lesson.sourceType === 'decision' ? DECISION_CHECKS : CHECKS).map((c) => {
     const v = lesson[c.field];
     const ok = Array.isArray(v) ? v.length > 0 : Boolean(v && String(v).trim());
     return { ...c, ok };

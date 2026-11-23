@@ -168,6 +168,13 @@ export function lessonFromSections(sections, base) {
 /** 0..1 — how actionable a lesson is. Used to rank & to nudge teams to improve postmortems. */
 export function lessonQuality(l) {
   let q = 0;
+  if (l.sourceType === 'decision') {
+    // A decision record needs the why, the rule, and where it applies, not a trigger.
+    if (l.summary) q += 0.3;
+    if (l.guardrails?.length) q += 0.45;
+    if (l.components?.length) q += 0.25;
+    return Number(q.toFixed(2));
+  }
   if (l.trigger) q += 0.3;
   if (l.rootCause) q += 0.25;
   if (l.guardrails?.length) q += 0.3;

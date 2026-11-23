@@ -48,6 +48,8 @@ export function htmlToText(html) {
   return decodeEntities(
     String(html || '')
       .replace(/<ac:structured-macro[^>]*ac:name="(?:toc|children|jira)"[\s\S]*?<\/ac:structured-macro>/g, ' ')
+      // Template prompts ("What change set this off?") are not content.
+      .replace(/<ac:placeholder[^>]*>[\s\S]*?<\/ac:placeholder>/g, ' ')
       .replace(/<(br|\/p|\/li|\/tr|\/h[1-6])\s*\/?>/gi, '\n')
       .replace(/<li[^>]*>/gi, '\n• ')
       .replace(/<[^>]+>/g, ' ')
@@ -127,7 +129,7 @@ export function parseMeta(text) {
     meta.durationMin = Math.round((h ? parseFloat(h) * 60 : 0) + (mins ? parseInt(mins, 10) : 0)) || undefined;
   }
   meta.date = grab(/\b(?:date|occurred|incident date)\s*[:=]\s*(\d{4}-\d{2}-\d{2})/i);
-  meta.incidentKey = grab(/\b(?:incident|jira|ticket)\s*[:=]\s*([A-Z][A-Z0-9]+-\d+)/);
+  meta.incidentKey = grab(/\b(?:[Ii]ncident|[Jj]ira|[Tt]icket)(?:\s+key)?\s*[:=]\s*([A-Z][A-Z0-9]+-\d+)/);
   return meta;
 }
 
@@ -166,6 +168,13 @@ export function lessonFromSections(sections, base) {
 /** 0..1 — how actionable a lesson is. Used to rank & to nudge teams to improve postmortems. */
 export function lessonQuality(l) {
   let q = 0;
+  if (l.sourceType === 'decision') {
+    // A decision record needs the why, the rule, and where it applies, not a trigger.
+    if (l.summary) q += 0.3;
+    if (l.guardrails?.length) q += 0.45;
+    if (l.components?.length) q += 0.25;
+    return Number(q.toFixed(2));
+  }
   if (l.trigger) q += 0.3;
   if (l.rootCause) q += 0.25;
   if (l.guardrails?.length) q += 0.3;

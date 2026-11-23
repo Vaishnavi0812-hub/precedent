@@ -23,7 +23,7 @@ function App() {
       <Stack space="space.200">
         <Stack space="space.075">
           <Inline spread="space-between" alignBlock="center">
-            <Heading size="small">Precedent postmortem coach</Heading>
+            <Heading size="small">{data.sourceType === 'decision' ? 'Precedent decision coach' : 'Precedent postmortem coach'}</Heading>
             <Lozenge appearance={pct >= 85 ? 'success' : pct >= 50 ? 'moved' : 'removed'} isBold>{`${pct}% actionable`}</Lozenge>
           </Inline>
           <ProgressBar value={data.quality} ariaLabel="Actionability" appearance={pct >= 85 ? 'success' : 'default'} />
@@ -69,7 +69,7 @@ function App() {
                 <Link href={`/browse/${p.issueKey}`} openNewTab>{p.issueKey}</Link>
                 <Text size="small">{p.summary}</Text>
               </Inline>
-            )) : <Text size="small" color="color.text.subtle">When new work resembles this incident, Precedent will warn the team and list it here.</Text>}
+            )) : <Text size="small" color="color.text.subtle">{`When new work resembles this ${data.sourceType === 'decision' ? 'decision' : 'incident'}, Precedent will warn the team and list it here.`}</Text>}
             {data.guardrailsAdopted ? <Text size="small" color="color.text.subtle">{`${data.guardrailsAdopted} guardrails from this page were added to later work.`}</Text> : null}
           </Stack>
         ) : null}
