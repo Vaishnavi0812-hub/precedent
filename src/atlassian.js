@@ -148,6 +148,28 @@ export async function getPage(id) {
   return normalizePage(page, labels);
 }
 
+/**
+ * Page properties: small JSON values stored on the page itself. Jira and
+ * Confluence installs of a Forge app have separate storage, so anything both
+ * sides need to see about a page lives here.
+ */
+export async function getPageProperty(pageId, key) {
+  const res = await confluence('app', route`/wiki/api/v2/pages/${pageId}/properties?key=${key}`, {}, 'get page property');
+  return res.results?.[0] || null;
+}
+
+export async function setPageProperty(pageId, key, value) {
+  const cur = await getPageProperty(pageId, key);
+  if (cur) {
+    return confluence('app', route`/wiki/api/v2/pages/${pageId}/properties/${cur.id}`, {
+      method: 'PUT', body: JSON.stringify({ key, value, version: { number: (cur.version?.number || 1) + 1 } }),
+    }, 'update page property');
+  }
+  return confluence('app', route`/wiki/api/v2/pages/${pageId}/properties`, {
+    method: 'POST', body: JSON.stringify({ key, value }),
+  }, 'create page property');
+}
+
 /** CQL search (v1 search API, which has no v2 equivalent), then hydrate pages via v2. */
 export async function searchPages(cql, { max = 200 } = {}) {
   const ids = [];

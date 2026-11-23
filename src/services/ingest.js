@@ -4,7 +4,7 @@
  */
 import { searchPages, getPage, searchIssues, getIssue, jiraBaseUrl, confluenceBaseUrl } from '../atlassian.js';
 import { lessonFromConfluencePage, lessonFromIncidentIssue, classifyPage } from '../engine/extract.js';
-import { saveLessons, saveLesson, listLessons, deleteLesson, getConfig, bumpStat } from '../store.js';
+import { saveLessons, saveLesson, listLessons, deleteLesson, getConfig, bumpStat, publishAllPageImpact } from '../store.js';
 import { kvs } from '@forge/kvs';
 
 const cqlList = (labels) => labels.map((l) => `"${l.replace(/"/g, '')}"`).join(',');
@@ -40,10 +40,26 @@ export function lessonIfLearnable(page, config, base) {
  * @param extraPageIds pages known to be relevant (e.g. just created) that the
  *   search index may not have caught up with yet. Fetched directly by id.
  */
-export async function fetchConfluenceLessons(config, extraPageIds = []) {
+function lessonPagesCql(config) {
   const labels = [...config.postmortemLabels, ...config.decisionLabels];
   const discover = config.autoDiscover === false ? '' : ` OR ${DISCOVERY_TERMS.map((t) => `title ~ "${t}"`).join(' OR ')}`;
-  const { pages, base } = await searchPages(`type=page AND (label in (${cqlList(labels)})${discover})`, { max: 150 });
+  return `type=page AND (label in (${cqlList(labels)})${discover})`;
+}
+
+/**
+ * Quick sync: learn pages edited in the last few minutes. Confluence page events
+ * reach only the Confluence install of the app, so the Jira side polls instead.
+ */
+export async function syncRecent(minutes = 15) {
+  const config = await getConfig();
+  const { pages, base } = await searchPages(`${lessonPagesCql(config)} AND lastmodified >= now("-${minutes}m")`, { max: 30 });
+  const lessons = pages.map((p) => lessonIfLearnable(p, config, base)).filter(Boolean);
+  if (lessons.length) await saveLessons(lessons);
+  return lessons.length;
+}
+
+export async function fetchConfluenceLessons(config, extraPageIds = []) {
+  const { pages, base } = await searchPages(lessonPagesCql(config), { max: 150 });
   const seen = new Set(pages.map((p) => String(p.id)));
   const missing = extraPageIds.map(String).filter((id) => !seen.has(id));
   for (let i = 0; i < missing.length; i += 6) {
@@ -126,6 +142,7 @@ export async function syncAll({ extraPageIds = [] } = {}) {
     avgQuality: lessons.length ? Number((lessons.reduce((s, l) => s + (l.quality || 0), 0) / lessons.length).toFixed(2)) : 0,
   };
   await kvs.set('lastSync', summary);
+  await publishAllPageImpact().catch((e) => console.warn('publish page impact', e.message));
   return summary;
 }
 

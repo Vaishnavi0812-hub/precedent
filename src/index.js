@@ -4,7 +4,7 @@
 import ResolverModule from '@forge/resolver';
 import { Queue } from '@forge/events';
 import { checkIssue, applyGuardrail, dismiss, autoFlag, peopleForLesson } from './services/precedent.js';
-import { syncAll, getLastSync, ingestPage, ingestIncident, isIncidentIssue } from './services/ingest.js';
+import { syncAll, syncRecent, getLastSync, ingestPage, ingestIncident, isIncidentIssue } from './services/ingest.js';
 import { draftPostmortem } from './services/draft.js';
 import { startSeedJob, runSeedSlice, getSeedProgress, failSeed } from './services/seed.js';
 import { getConfig, setConfig, getStats, listLessons, clearLessons } from './store.js';
@@ -157,6 +157,16 @@ export async function onPageEvent(event) {
 
 export async function scheduledSync() {
   await jobs.push({ body: { type: 'sync' } });
+}
+
+/** Every 5 minutes: learn postmortems/ADRs edited recently (page events don't reach the Jira install). */
+export async function quickSync() {
+  try {
+    const n = await syncRecent(15);
+    if (n) console.log(`quickSync learned ${n} recently edited pages`);
+  } catch (e) {
+    console.warn('quickSync', e.message);
+  }
 }
 
 /* ---------------- Rovo agent actions ---------------- */

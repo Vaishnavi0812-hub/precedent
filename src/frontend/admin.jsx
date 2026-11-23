@@ -195,7 +195,7 @@ function App() {
         <Stack space="space.200">
           <Heading size="medium">Your history</Heading>
           <Text>
-            {`Precedent finds your postmortems, incident reviews, RCAs and decision records (ADRs) on its own, by title and structure; no labelling needed. Pages labelled "${config.postmortemLabels.slice(0, 2).join('", "')}" or "${config.decisionLabels.slice(0, 2).join('", "')}" are always included. It also learns from resolved Jira Service Management incidents. New pages and resolved incidents are learned as soon as they appear.`}
+            {`Precedent finds your postmortems, incident reviews, RCAs and decision records (ADRs) on its own, by title and structure; no labelling needed. Pages labelled "${config.postmortemLabels.slice(0, 2).join('", "')}" or "${config.decisionLabels.slice(0, 2).join('", "')}" are always included. It also learns from resolved Jira Service Management incidents. Resolved incidents are learned immediately; new or edited pages within 5 minutes.`}
           </Text>
           <Inline space="space.200" alignBlock="center" shouldWrap>
             <Button isDisabled={syncing} onClick={syncNow}>{syncing ? 'Re-reading…' : 'Re-read everything now'}</Button>

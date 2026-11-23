@@ -195,6 +195,9 @@ modules:
     - key: precedent-hourly-sync
       function: scheduled-sync
       interval: hour
+    - key: precedent-quick-sync
+      function: quick-sync
+      interval: fiveMinute
 
   consumer:
     - key: precedent-job-consumer
@@ -224,6 +227,8 @@ modules:
       handler: index.onPageEvent
     - key: scheduled-sync
       handler: index.scheduledSync
+    - key: quick-sync
+      handler: index.quickSync
     - key: job-consumer
       handler: index.jobConsumer
       timeoutSeconds: 900

@@ -5,6 +5,7 @@
  */
 import { kvs, WhereConditions } from '@forge/kvs';
 import { buildIndex } from './engine/match.js';
+import { getPageProperty, setPageProperty } from './atlassian.js';
 
 const LESSON_PREFIX = 'lesson:';
 const CACHE_TTL_MS = 30_000;
@@ -128,6 +129,41 @@ export async function recordHit(lessonId, issueKey, kind, extra = {}) {
   await kvs.set(hitKey(lessonId), hits.slice(-200));
   const index = (await kvs.get('hits:index')) || [];
   if (!index.includes(lessonId)) await kvs.set('hits:index', [...index, lessonId].slice(-1000));
+  // The Confluence side of the app can't read this storage; publish onto the page itself.
+  if (lessonId.startsWith('cf:')) {
+    await setPageProperty(lessonId.slice(3), PAGE_IMPACT_KEY, summariseHits(hits))
+      .catch((e) => console.warn(`publish impact to page ${lessonId}: ${e.message}`));
+  }
+}
+
+export const PAGE_IMPACT_KEY = 'precedent-impact';
+
+/** Compact, page-sized summary of what a lesson has protected. */
+export function summariseHits(hits) {
+  const flagged = [...new Map(hits.filter((h) => h.kind === 'flagged').map((h) => [h.issueKey, h])).values()];
+  return {
+    protected: flagged.slice(-20).map((h) => ({ issueKey: h.issueKey, summary: String(h.summary || '').slice(0, 140), at: h.at })),
+    protectedCount: flagged.length,
+    guardrailsAdopted: hits.filter((h) => h.kind === 'guarded').length,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+/** Re-publish every page lesson's impact onto its page (backfill / repair). */
+export async function publishAllPageImpact() {
+  const index = (await kvs.get('hits:index')) || [];
+  for (const id of index.filter((x) => x.startsWith('cf:'))) {
+    await setPageProperty(id.slice(3), PAGE_IMPACT_KEY, summariseHits(await getHits(id)))
+      .catch((e) => console.warn(`publish impact to page ${id}: ${e.message}`));
+  }
+}
+
+/** Hits for a page lesson as seen from either product: local storage, else the page property. */
+export async function getPageImpact(lessonId) {
+  const local = await getHits(lessonId);
+  if (local.length || !lessonId.startsWith('cf:')) return summariseHits(local);
+  const prop = await getPageProperty(lessonId.slice(3), PAGE_IMPACT_KEY).catch(() => null);
+  return prop?.value || summariseHits([]);
 }
 
 export async function getHits(lessonId) {

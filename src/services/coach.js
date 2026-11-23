@@ -9,7 +9,7 @@
 import { getPage, confluenceBaseUrl } from '../atlassian.js';
 import { lessonFromConfluencePage, classifyPage } from '../engine/extract.js';
 import { lessonIfLearnable } from './ingest.js';
-import { listLessons, getHits, getAllHits, getConfig, saveLesson } from '../store.js';
+import { listLessons, getAllHits, getConfig, getPageImpact } from '../store.js';
 
 const CHECKS = [
   { field: 'trigger', label: 'What changed (the trigger)', heading: 'Trigger', why: 'Precedent matches new work on the kind of change that caused the incident.' },
@@ -18,14 +18,12 @@ const CHECKS = [
   { field: 'components', label: 'Where it happened (affected components)', heading: 'Affected components', why: 'Component overlap is the strongest matching signal.' },
 ];
 
-function present(lesson, hits) {
+function present(lesson, impact) {
   const checks = CHECKS.map((c) => {
     const v = lesson[c.field];
     const ok = Array.isArray(v) ? v.length > 0 : Boolean(v && String(v).trim());
     return { ...c, ok };
   });
-  const flagged = hits.filter((h) => h.kind === 'flagged');
-  const guarded = hits.filter((h) => h.kind === 'guarded');
   return {
     id: lesson.id,
     title: lesson.title,
@@ -34,8 +32,8 @@ function present(lesson, hits) {
     checks,
     guardrails: lesson.guardrails || [],
     components: lesson.components || [],
-    protectedChanges: [...new Map(flagged.map((h) => [h.issueKey, h])).values()].map((h) => ({ issueKey: h.issueKey, summary: h.summary, at: h.at })),
-    guardrailsAdopted: guarded.length,
+    protectedChanges: [...(impact.protected || [])].reverse(),
+    guardrailsAdopted: impact.guardrailsAdopted || 0,
   };
 }
 
@@ -47,25 +45,27 @@ export async function coachPage(pageId) {
   const learnable = lessonIfLearnable(page, config, base);
   const tracked = Boolean(learnable);
   const lesson = learnable || lessonFromConfluencePage(page, base);
-  if (tracked) await saveLesson(lesson); // keep the stored lesson fresh when someone looks at the page
-  const hits = await getHits(lesson.id);
+  const impact = await getPageImpact(lesson.id);
   return {
     tracked,
     discovered: Boolean(learnable?.discovered),
     looksLikePostmortem: Boolean(classifyPage(page)),
     suggestedLabel: lesson.sourceType === 'decision' ? 'decision' : 'postmortem',
-    ...present(lesson, hits),
+    ...present(lesson, impact),
   };
 }
 
-/** Short byline title, e.g. "Precedent · 85% actionable · protected 3". */
+/**
+ * Short byline title, e.g. "Precedent · 85% actionable · protected 3".
+ * Computed from the page itself: this runs in the Confluence install, whose
+ * storage doesn't hold the lessons the Jira side learned.
+ */
 export async function bylineTitle(pageId) {
   try {
-    const lessons = await listLessons();
-    const lesson = lessons.find((l) => l.id === `cf:${pageId}`);
+    const [config, page, base] = await Promise.all([getConfig(), getPage(pageId), confluenceBaseUrl()]);
+    const lesson = lessonIfLearnable(page, config, base);
     if (!lesson) return 'Precedent';
-    const hits = await getHits(lesson.id);
-    const protectedCount = new Set(hits.filter((h) => h.kind === 'flagged').map((h) => h.issueKey)).size;
+    const { protectedCount } = await getPageImpact(lesson.id);
     const q = Math.round((lesson.quality ?? 0) * 100);
     return `Precedent · ${q}% actionable${protectedCount ? ` · protected ${protectedCount}` : ''}`;
   } catch (e) {
