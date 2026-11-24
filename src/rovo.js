@@ -4,6 +4,7 @@
  */
 import { checkText, checkIssue, applyGuardrail, peopleForLesson } from './services/precedent.js';
 import { listLessons } from './store.js';
+import { riskRadar } from './services/radar.js';
 import { LEVELS } from './engine/match.js';
 
 const ISSUE_KEY = /\b[A-Z][A-Z0-9]+-\d+\b/;
@@ -144,6 +145,32 @@ export const addGuardrail = wrap(async (payload) => {
 });
 
 /** Teamwork Graph: who has been here before, and what else should I read? */
+/** Sprint planning / release readiness: open work that could repeat an incident. */
+export const scanUpcomingWork = wrap(async (payload) => {
+  const scope = /open|backlog|all/i.test(payload.scope || '') ? 'open' : 'sprint';
+  const projectKey = String(payload.projectKey || '').trim().toUpperCase() || undefined;
+  const r = await riskRadar({ projectKey, scope, max: 60 });
+  return {
+    scanned: r.scanned,
+    scope: r.scope === 'sprint' ? 'active and upcoming sprints' : 'all open work',
+    note: scope === 'sprint' && r.scope !== 'sprint' ? 'No sprints found, so all open work was scanned.' : r.note,
+    atRisk: r.atRisk,
+    unguarded: r.unguarded,
+    outageMinutesAtStake: r.minutesAtStake,
+    items: r.items.slice(0, 10).map((i) => ({
+      issue: i.issueKey,
+      summary: i.summary,
+      status: i.status,
+      couldRepeat: i.precedent,
+      link: i.precedentUrl,
+      severity: i.severity,
+      minutes: i.minutes,
+      guarded: i.guarded,
+      suggestedGuardrail: i.guarded ? null : i.firstGuardrail,
+    })),
+  };
+});
+
 export const whoKnows = wrap(async (payload, ctx) => {
   const ref = String(payload.reference || '').trim();
   if (!ref) return { error: 'Which incident or decision? e.g. INC-105.' };

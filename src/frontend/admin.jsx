@@ -43,11 +43,18 @@ function App() {
   const poll = useRef(null);
 
   const [impact, setImpact] = useState(null);
+  const [radar, setRadar] = useState(null);
+  const [radarScope, setRadarScope] = useState({ label: 'Active and upcoming sprints', value: 'sprint' });
+  const loadRadar = useCallback((scope) => {
+    setRadar({ loading: true });
+    invoke('getRadar', { scope }).then(setRadar).catch((e) => setRadar({ error: e.message || String(e) }));
+  }, []);
   const load = useCallback(() => {
     invoke('getImpact').then(setImpact).catch(() => setImpact(null));
     return invoke('getAdminState').then(setState).catch((e) => setError(e.message));
   }, []);
   useEffect(() => { load(); return () => clearInterval(poll.current); }, [load]);
+  useEffect(() => { loadRadar('sprint'); }, [loadRadar]);
 
   const seedRunning = state?.seed && ['queued', 'running'].includes(state.seed.status);
   useEffect(() => {
@@ -118,7 +125,10 @@ function App() {
                 <Stat label="Near-misses caught" value={impact.nearMissCount} />
                 <Stat label="Outage minutes those same mistakes cost last time" value={impact.minutesAtRisk.toLocaleString()} />
                 <Stat label="Would-be SEV1 repeats" value={impact.sev1Repeats} />
-                <Stat label="Guardrails adopted" value={impact.guardrailsAdopted} />
+                <Stat
+                  label={`Guardrails adopted${impact.guardrailsCompleted || impact.guardrailsSkipped ? ` · ${impact.guardrailsCompleted || 0} done · ${impact.guardrailsSkipped || 0} skipped` : ''}`}
+                  value={impact.guardrailsAdopted}
+                />
                 <Stat label="Average postmortem quality" value={`${impact.avgQuality}%`} />
               </Inline>
               {impact.nearMisses.length ? (
@@ -143,6 +153,57 @@ function App() {
           <Inline space="space.200" shouldWrap>
             <Text size="small" color="color.text.subtle">{`${lessons.length} lessons learned · ${stats.issuesFlagged || 0} warnings posted · ${stats.dismissed || 0} dismissed as not relevant`}</Text>
           </Inline>
+        </Stack>
+      </Box>
+
+      {/* ---- Risk radar ---- */}
+      <Box xcss={panel}>
+        <Stack space="space.200">
+          <Inline space="space.100" alignBlock="center" spread="space-between" shouldWrap>
+            <Inline space="space.100" alignBlock="center">
+              <Heading size="medium">Risk radar</Heading>
+              <Lozenge appearance="moved">Open work</Lozenge>
+            </Inline>
+            <Inline space="space.100" alignBlock="center">
+              <Box xcss={xcss({ width: '220px' })}>
+                <Select
+                  inputId="radar-scope"
+                  options={[{ label: 'Active and upcoming sprints', value: 'sprint' }, { label: 'All open work', value: 'open' }]}
+                  value={radarScope}
+                  onChange={(v) => { setRadarScope(v); loadRadar(v.value); }}
+                />
+              </Box>
+              <Button isDisabled={radar?.loading} onClick={() => loadRadar(radarScope.value)}>{radar?.loading ? 'Scanning…' : 'Rescan'}</Button>
+            </Inline>
+          </Inline>
+          <Text color="color.text.subtle">Work that hasn't shipped yet but resembles a past incident. Unguarded items come first: that's where the next repeat outage is.</Text>
+          {!radar || radar.loading ? <Spinner size="small" label="Scanning open work" /> : radar.error ? (
+            <Text color="color.text.danger">{radar.error}</Text>
+          ) : (
+            <>
+              <Inline space="space.200" shouldWrap>
+                <Stat label={`of ${radar.scanned} open items repeat a past incident`} value={radar.atRisk} />
+                <Stat label="have no guardrail yet" value={radar.unguarded} />
+                <Stat label="outage minutes at stake (unguarded SEV1/SEV2)" value={radar.minutesAtStake.toLocaleString()} />
+              </Inline>
+              {radar.scope !== radarScope.value ? <Text size="small" color="color.text.subtle">No sprints found, so this shows all open work.</Text> : null}
+              {radar.items.length ? (
+                <DynamicTable
+                  rowsPerPage={8}
+                  head={{ cells: [{ key: 'i', content: 'Open work' }, { key: 'p', content: 'Could repeat' }, { key: 'c', content: 'Cost last time' }, { key: 'g', content: 'Status' }] }}
+                  rows={radar.items.map((r) => ({
+                    key: r.issueKey,
+                    cells: [
+                      { key: 'i', content: <Link href={`/browse/${r.issueKey}`} openNewTab>{`${r.issueKey} ${r.summary}`}</Link> },
+                      { key: 'p', content: r.precedentUrl ? <Link href={r.precedentUrl} openNewTab>{r.precedent}</Link> : r.precedent },
+                      { key: 'c', content: r.minutes ? `${r.severity} · ${r.minutes} min` : (r.severity || '—') },
+                      { key: 'g', content: <Lozenge appearance={r.guarded ? 'success' : 'removed'}>{r.guarded ? `${r.guardrailsAdded} guardrail${r.guardrailsAdded === 1 ? '' : 's'}` : 'Unguarded'}</Lozenge> },
+                    ],
+                  }))}
+                />
+              ) : <Text color="color.text.subtle">Nothing in open work resembles a past incident.</Text>}
+            </>
+          )}
         </Stack>
       </Box>
 

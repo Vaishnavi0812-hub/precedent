@@ -6,6 +6,8 @@ import { Queue } from '@forge/events';
 import { checkIssue, applyGuardrail, dismiss, autoFlag, peopleForLesson } from './services/precedent.js';
 import { syncAll, syncRecent, getLastSync, ingestPage, ingestIncident, isIncidentIssue } from './services/ingest.js';
 import { draftPostmortem } from './services/draft.js';
+import { onStatusChange } from './services/followthrough.js';
+import { riskRadar } from './services/radar.js';
 import { startSeedJob, runSeedSlice, getSeedProgress, failSeed } from './services/seed.js';
 import { getConfig, setConfig, getStats, listLessons, clearLessons } from './store.js';
 import { listProjects, getIssue } from './atlassian.js';
@@ -77,6 +79,8 @@ resolver.define('syncNow', async () => syncAll());
 
 resolver.define('getImpact', async () => computeImpact());
 
+resolver.define('getRadar', async ({ payload }) => riskRadar({ projectKey: payload?.projectKey, scope: payload?.scope || 'open' }));
+
 /* ---------------- Confluence: Postmortem Quality Coach ---------------- */
 
 resolver.define('coachPage', async ({ context }) => {
@@ -137,6 +141,9 @@ export async function onIssueEvent(event) {
       }
       return;
     }
+    if (changed.includes('status')) {
+      await onStatusChange(issue).catch((e) => console.error(`followThrough ${key}`, e.message));
+    }
     const relevantUpdate = event.eventType === 'avi:jira:created:issue'
       || changed.some((f) => ['summary', 'description', 'Component', 'components'].includes(f));
     if (relevantUpdate) await autoFlag(key);
@@ -176,6 +183,7 @@ export {
   checkIssueAction as rovoCheckIssue,
   getLesson as rovoGetLesson,
   riskHotspots as rovoHotspots,
+  scanUpcomingWork as rovoScanWork,
   addGuardrail as rovoAddGuardrail,
   whoKnows as rovoWhoKnows,
 } from './rovo.js';

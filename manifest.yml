@@ -31,6 +31,9 @@ modules:
         - When someone asks who knows about an incident, who to talk to, or who has
           been here before, call who-knows. After a strong precedent, offer to find the
           people who handled it.
+        - When someone asks what in upcoming work, the sprint, the backlog or a project could
+          repeat an incident (sprint planning, release readiness), call scan-upcoming-work.
+          Lead with the unguarded items: they are where the next repeat outage is.
         - Only call add-guardrail when the user explicitly asks you to add a guardrail to an
           issue. Confirm the exact guardrail text and issue key in your reply.
 
@@ -54,12 +57,13 @@ modules:
         - Has anything like this gone wrong before? I'm about to lower our cache TTL.
         - Does the issue I'm looking at repeat a past incident?
         - Where do we keep getting hurt?
-        - What happened in INC-105 and what did we agree to change?
+        - What in our upcoming sprint could repeat an incident?
       actions:
         - search-precedents
         - check-issue
         - get-lesson
         - risk-hotspots
+        - scan-upcoming-work
         - add-guardrail
         - who-knows
 
@@ -71,6 +75,7 @@ modules:
         - check-issue
         - get-lesson
         - risk-hotspots
+        - scan-upcoming-work
         - add-guardrail
         - who-knows
 
@@ -118,6 +123,22 @@ modules:
       function: rovo-hotspots
       actionVerb: GET
       description: Summarise where the organisation keeps getting hurt - components with the most incidents and outage minutes, recurring themes, and postmortems that need improving.
+    - key: scan-upcoming-work
+      name: Scan upcoming work
+      function: rovo-scan-work
+      actionVerb: GET
+      description: Scan open work (active and upcoming sprints, or the whole open backlog) for items that resemble past incidents, and say which have no guardrail yet. Use for sprint planning and release readiness.
+      inputs:
+        projectKey:
+          title: Project key
+          type: string
+          required: false
+          description: Optional Jira project key to limit the scan, e.g. LUMEN.
+        scope:
+          title: Scope
+          type: string
+          required: false
+          description: "'sprint' for active and upcoming sprints (default), or 'open' for all open work."
     - key: add-guardrail
       name: Add guardrail
       function: rovo-add-guardrail
@@ -215,6 +236,8 @@ modules:
       handler: index.rovoGetLesson
     - key: rovo-hotspots
       handler: index.rovoHotspots
+    - key: rovo-scan-work
+      handler: index.rovoScanWork
     - key: rovo-add-guardrail
       handler: index.rovoAddGuardrail
     - key: rovo-who-knows

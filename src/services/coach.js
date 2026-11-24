@@ -89,8 +89,13 @@ export async function computeImpact() {
   const byId = new Map(lessons.map((l) => [l.id, l]));
   const issues = new Map(); // issueKey -> { summary, lessons:Set, guarded }
   let guardrailsAdopted = 0;
+  let guardrailsCompleted = 0;
+  let guardrailsSkipped = 0;
   for (const [lessonId, hits] of Object.entries(hitsByLesson)) {
     for (const h of hits) {
+      // Follow-through records are keyed by sub-task, not by the change itself.
+      if (h.kind === 'completed') { guardrailsCompleted += 1; continue; }
+      if (h.kind === 'skipped') { guardrailsSkipped += 1; continue; }
       const e = issues.get(h.issueKey) || { issueKey: h.issueKey, summary: h.summary, lessons: new Set(), guarded: false };
       e.lessons.add(lessonId);
       if (h.kind === 'guarded') { e.guarded = true; guardrailsAdopted += 1; }
@@ -133,6 +138,8 @@ export async function computeImpact() {
     nearMissCount: nearMisses.length,
     guardedCount: nearMisses.filter((n) => n.guarded).length,
     guardrailsAdopted,
+    guardrailsCompleted,
+    guardrailsSkipped,
     minutesAtRisk,
     sev1Repeats,
     topLessons,
