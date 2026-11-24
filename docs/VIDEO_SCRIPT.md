@@ -65,9 +65,9 @@ Use 1080p, a zoomed browser (125%) and dark or light mode consistently, and hide
 
 > "Engineers can just ask." *(Answer appears: verdict first, INC-105 and ADR-007 cited.)* "A verdict first, every claim linked."
 
-**Type:** *"Where do we keep getting hurt?"*
+**Type:** *"What in our upcoming work could repeat an incident?"*
 
-> "Leaders get the hotspots, ranked by real outage minutes."
+> "Managers get the whole backlog in one answer: four unguarded items, about three hundred and thirty minutes of outage at stake, each with the guardrail to add."
 
 **Type:** *"Who has been here before on INC-105?"*
 
@@ -87,9 +87,11 @@ Use 1080p, a zoomed browser (125%) and dark or light mode consistently, and hide
 
 ## 2:20–2:40 · Impact
 
-**Screen:** Apps → Precedent → Impact (near-misses · outage minutes · would-be SEV1 repeats).
+**Screen:** Apps → Precedent → Impact (near-misses · outage minutes · would-be SEV1 repeats · guardrails done/skipped), then scroll to **Risk radar**.
 
-> "And it measures itself. *[N]* near-misses caught. *[M]* minutes of outages those same mistakes cost last time."
+> "And it measures itself. *[N]* near-misses caught. *[M]* minutes of outages those same mistakes cost last time. And it checks the promise was kept: if work ships with its guardrail still open, Precedent calls it out."
+
+*(Optional 3 s: flash the LUMEN-4 "marked done while 1 guardrail is still open" comment.)*
 
 *(Read the real numbers off your screen on the day you record.)*
 

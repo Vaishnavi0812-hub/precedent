@@ -23,9 +23,11 @@ Atlassian's tools help you **write** the postmortem: Jira Service Management pos
 | **Déjà vu panel** | Jira issue | Past incidents and decisions that resemble this work: what went wrong, what it cost, and the guardrails agreed afterwards. The panel also shows why each match was made. |
 | **One-click guardrails** | Jira issue | Each guardrail becomes a tracked sub-task (or a checklist comment) on the new work. |
 | **Auto-flag** | Jira | New issues that strongly resemble a past incident get one warning comment, without anyone opening the panel. |
+| **Risk radar** | Jira (Apps → Precedent), Rovo | The manager's view: every piece of open work (or just the active and upcoming sprints) that repeats a past incident, unguarded first, with the outage minutes at stake. Ask Rovo *"What in our upcoming work could repeat an incident?"* |
+| **Guardrail follow-through** | Jira | Adding a guardrail is a promise. If the work is marked done while its guardrail sub-task is still open, Precedent says so on the issue and names the incident. The dashboard tracks guardrails *adopted · done · skipped*. |
 | **Repeat-incident check** | Bitbucket PR | A PR panel names the incident the diff resembles. A merge check fails until the author acknowledges it (`Precedent-Ack: INC-105`). It blocks merges on Premium workspaces and warns on other plans. |
-| **Rovo agent "Precedent"** | Rovo chat | "Has this gone wrong before?", "Where do we keep getting hurt?", "Who has been here before?", "Add the guardrail". Six actions, answers backed by the incident history. |
-| **MCP server** | Any MCP client | The same six tools, available to coding agents in the IDE. |
+| **Rovo agent "Precedent"** | Rovo chat | "Has this gone wrong before?", "What in our upcoming work could repeat an incident?", "Where do we keep getting hurt?", "Who has been here before?", "Add the guardrail". Seven actions, answers backed by the incident history. |
+| **MCP server** | Any MCP client | The same seven tools, available to coding agents in the IDE. |
 | **Who has been here before?** | Jira and Rovo | Uses **Teamwork Graph** to trace a postmortem to the people who wrote and edited it, their teams, and linked decisions. You know who to ask. |
 | **Postmortem drafts** | JSM → Confluence | When an incident is resolved, Precedent drafts the postmortem in Confluence with the sections it learns from. It also tells the incident if *this has happened before*. |
 | **Postmortem quality coach** | Confluence byline | Scores every postmortem and decision record for actionability, says what's missing, and shows how many later changes the page has already protected. |
@@ -45,7 +47,7 @@ Atlassian's tools help you **write** the postmortem: Jira Service Management pos
    - Precedent has already commented on it.
    - Open the **Precedent** panel (the Apps button under the issue title) and click **Add** on a guardrail.
 4. In Confluence, open any postmortem in the **Lumen Market Engineering** space and click the **Precedent** byline.
-5. Back in **Apps → Precedent**, look at the impact dashboard.
+5. Back in **Apps → Precedent**, look at the impact dashboard and the **risk radar**. Then mark a guarded work item *Done* while its guardrail sub-task is still open, and watch Precedent call it out.
 6. *With Rovo enabled:* open Rovo chat, pick the **Precedent** agent and ask *"Where do we keep getting hurt?"* or *"I'm about to add retries to the shipping client. Has this gone wrong before?"*
 7. *Bitbucket (optional):*
    1. Install the companion app on a workspace: **[Install Precedent for Bitbucket](https://developer.atlassian.com/console/install/d78bc630-f99d-4da6-9853-b38e62bd0746?signature=AYABeMxjB7k7Cikat92bswtjw7UAAAADAAdhd3Mta21zAEthcm46YXdzOmttczp1cy13ZXN0LTI6NzA5NTg3ODM1MjQzOmtleS83MDVlZDY3MC1mNTdjLTQxYjUtOWY5Yi1lM2YyZGNjMTQ2ZTcAuAECAQB4CxqLTo9l4lqXuFjNim1xJM%2Bp%2F3TVP9xHS2BrU5DRRucBdLl%2FtcIix3BDUnI1AAJgJAAAAH4wfAYJKoZIhvcNAQcGoG8wbQIBADBoBgkqhkiG9w0BBwEwHgYJYIZIAWUDBAEuMBEEDIVKCR%2F%2FxvYQ%2BDVS0AIBEIA73FMOy7ombxE6mZtje8WkInNX1TTs8GbDNOv%2BrWPQAQ99OzRfs8ewwUYqcMwuWb5EwbfZDcgcduLfXn0AB2F3cy1rbXMAS2Fybjphd3M6a21zOmV1LXdlc3QtMTo3MDk1ODc4MzUyNDM6a2V5LzQ2MzBjZTZiLTAwYzMtNGRlMi04NzdiLTYyN2UyMDYwZTVjYwC4AQICAHi9bVMAkme4qVQX1fQHo6ePw3H40A7cGfz7yrmSfBWMXgGALw2IGgImz3mZLVr6HQGGAAAAfjB8BgkqhkiG9w0BBwagbzBtAgEAMGgGCSqGSIb3DQEHATAeBglghkgBZQMEAS4wEQQMcc%2BN3OPIPkURAz2qAgEQgDtIxbFl7XFAxFnp%2BYFENe%2FokXtlpsN7zDK8JdlZoQtzOYuhuuiWUG%2BTWWH9A4WlzxiE1ky5Ny%2FlDFMtPQAHYXdzLWttcwBLYXJuOmF3czprbXM6dXMtZWFzdC0xOjcwOTU4NzgzNTI0MzprZXkvNmMxMjBiYTAtNGNkNS00OTg1LWI4MmUtNDBhMDQ5NTJjYzU3ALgBAgIAeDYASx0XCjkny4iLV6vz%2BKtEGSGT6kdt0QRpkn6D%2FlVEATd7xhjqL0boW1JW0mqnkqcAAAB%2BMHwGCSqGSIb3DQEHBqBvMG0CAQAwaAYJKoZIhvcNAQcBMB4GCWCGSAFlAwQBLjARBAwAIdJgyVrmoqkD4BYCARCAO9Ok4LasYb8mHqMRDRQ6JG2baXyVKxFSgny%2BDSHVafncHj8tLxjLJAK4DLGlhjoyD1KAi8uzuJMxlGzsAgAAAAAMAAAQAAAAAAAAAAAAAAAAAOTxQ%2FuqKIU33i2IfP4J9RT%2F%2F%2F%2F%2FAAAAAQAAAAAAAAAAAAAAAQAAADLyNSuFoHm%2FQyoo5mPHdWFOTFyT6cX9h8iw53aHxUO4vJf9VWNaRn%2FtJXwpxiiBFZLuQt6n%2FnsoGbqTZTC8yF%2BqoVQ%3D&product=bitbucket)**
@@ -72,13 +74,14 @@ Atlassian's tools help you **write** the postmortem: Jira Service Management pos
 ```
 
 - **Deterministic and free to run.** Matching uses field-weighted BM25, not an LLM call per page view. The same change always gets the same answer, in milliseconds, at no per-check cost. Reasoning and conversation go through **Rovo**, which is included with Atlassian Cloud.
-- **Explainable.** Every match shows the terms and components it matched on. Single-word coincidences are suppressed.
+- **Explainable and precise.** Every match shows the terms and components it matched on. Confidence is scaled by how many distinct words of the change agree with the lesson, and a component overlap counts double. So "Alter logo on home screen" never matches a schema-migration outage just because both say *alter*. The manager-facing radar and auto-flag use strong matches only.
 - **Triggers weigh most.** Postmortems are split by heading (Trigger, Root cause, Impact, Guardrails, Affected components, plus common aliases and Atlassian's template). The *kind of change* that caused an incident is what predicts the next one.
 - **Runs on Atlassian.** The main app has no external egress and no remote back end, so it is eligible for the *Runs on Atlassian* programme. All data stays in Forge storage and on your own Confluence pages.
 - **A closed loop:**
   - An incident is resolved, and Precedent drafts the postmortem.
   - The team fills it in, and Precedent learns from it within minutes.
   - Look-alike work gets warned, and the guardrails become sub-tasks.
+  - Work that ships with a guardrail still open gets called out.
   - The page shows that it *protected N changes*.
   - The dashboard shows what it was worth.
 
@@ -100,7 +103,7 @@ Atlassian's tools help you **write** the postmortem: Jira Service Management pos
 
 ```bash
 npm install
-npm test                         # 25 tests: engine, extraction, discovery, drafts, Bitbucket
+npm test                         # 27 tests: engine + precision, extraction, discovery, drafts, radar, Bitbucket
 forge deploy -e development
 forge install -e development     # Jira, then again for Confluence
 cd bitbucket && npm install && forge deploy -e development
@@ -111,7 +114,8 @@ node scripts/sync-engine.mjs     # after changing src/engine, re-vendor it into 
 src/
   engine/      tokenize · extract (storage/ADF → lessons, page classification) · match (BM25 + confidence)
   services/    precedent (check, guardrails, auto-flag) · ingest (sync, discovery, quick sync)
-               draft (postmortem drafts) · coach (quality + impact) · graph (Teamwork Graph) · seed (demo)
+               draft (postmortem drafts) · coach (quality + impact) · radar (open-work risk)
+               followthrough (guardrail completion) · graph (Teamwork Graph) · seed (demo)
   frontend/    UI Kit: issue panel · admin/impact page · Confluence coach
   rovo.js      Rovo agent / MCP actions
 bitbucket/     companion app: PR panel, merge check, workspace settings
