@@ -64,14 +64,16 @@ function Guardrail({ text, applied, onApply, busy }) {
           </Inline>
         </Box>
         {applied ? (
-          <Inline space="space.075" alignBlock="center">
-            <Lozenge appearance="success">Added</Lozenge>
-            {applied.key ? (
-              <Link href={`/browse/${applied.key}`}>{applied.key}</Link>
-            ) : (
-              <Text size="small" color="color.text.subtle">as checklist comment</Text>
-            )}
-          </Inline>
+          <Box xcss={xcss({ flexShrink: 0, whiteSpace: 'nowrap' })}>
+            <Inline space="space.075" alignBlock="center">
+              <Lozenge appearance="success">Added</Lozenge>
+              {applied.key ? (
+                <Link href={`/browse/${applied.key}`}>{applied.key}</Link>
+              ) : (
+                <Text size="small" color="color.text.subtle">as checklist</Text>
+              )}
+            </Inline>
+          </Box>
         ) : (
           <Button spacing="compact" appearance="default" isDisabled={busy} onClick={onApply}>
             {busy ? 'Adding…' : 'Add'}
