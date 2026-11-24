@@ -57,7 +57,7 @@ modules:
         - Has anything like this gone wrong before? I'm about to lower our cache TTL.
         - Does the issue I'm looking at repeat a past incident?
         - Where do we keep getting hurt?
-        - What in our upcoming sprint could repeat an incident?
+        - What in our upcoming work could repeat an incident?
       actions:
         - search-precedents
         - check-issue
@@ -138,7 +138,7 @@ modules:
           title: Scope
           type: string
           required: false
-          description: "'sprint' for active and upcoming sprints (default), or 'open' for all open work."
+          description: "'open' for all open work (default), or 'sprint' to limit to active and upcoming sprints. Use 'sprint' only when the user mentions a sprint."
     - key: add-guardrail
       name: Add guardrail
       function: rovo-add-guardrail

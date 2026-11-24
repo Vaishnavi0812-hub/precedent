@@ -147,7 +147,7 @@ export const addGuardrail = wrap(async (payload) => {
 /** Teamwork Graph: who has been here before, and what else should I read? */
 /** Sprint planning / release readiness: open work that could repeat an incident. */
 export const scanUpcomingWork = wrap(async (payload) => {
-  const scope = /open|backlog|all/i.test(payload.scope || '') ? 'open' : 'sprint';
+  const scope = /sprint/i.test(payload.scope || '') ? 'sprint' : 'open';
   const projectKey = String(payload.projectKey || '').trim().toUpperCase() || undefined;
   const r = await riskRadar({ projectKey, scope, max: 60 });
   return {

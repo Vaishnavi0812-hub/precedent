@@ -98,3 +98,12 @@ test('top demo hit is high confidence (the on-camera moment)', () => {
   assert.equal(refOf(top.lesson), 'INC-101');
   assert.equal(top.level, 'high');
 });
+
+test('short unrelated titles that share a word or two are not strong precedents', () => {
+  const index = buildIndex(demoLessons());
+  for (const text of ['Alter logo on Home screen', 'Mobile User Login', 'Password security update', 'Mobile Version Upgrade Notes',
+    'Investigate scalability issue when user volume exceeds 20k', 'Add dark mode to settings page']) {
+    const [m] = matchChange(index, { text, components: [], labels: [] }, { limit: 1, minConfidence: 0 });
+    assert.ok(!m || m.level !== 'high', `${text} -> ${m?.lesson.title} (${m?.confidence})`);
+  }
+});

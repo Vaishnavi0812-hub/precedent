@@ -44,7 +44,7 @@ function App() {
 
   const [impact, setImpact] = useState(null);
   const [radar, setRadar] = useState(null);
-  const [radarScope, setRadarScope] = useState({ label: 'Active and upcoming sprints', value: 'sprint' });
+  const [radarScope, setRadarScope] = useState({ label: 'All open work', value: 'open' });
   const loadRadar = useCallback((scope) => {
     setRadar({ loading: true });
     invoke('getRadar', { scope }).then(setRadar).catch((e) => setRadar({ error: e.message || String(e) }));
@@ -54,7 +54,7 @@ function App() {
     return invoke('getAdminState').then(setState).catch((e) => setError(e.message));
   }, []);
   useEffect(() => { load(); return () => clearInterval(poll.current); }, [load]);
-  useEffect(() => { loadRadar('sprint'); }, [loadRadar]);
+  useEffect(() => { loadRadar('open'); }, [loadRadar]);
 
   const seedRunning = state?.seed && ['queued', 'running'].includes(state.seed.status);
   useEffect(() => {

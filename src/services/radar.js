@@ -25,7 +25,7 @@ const OPEN_WORK = 'statusCategory != Done AND issuetype not in subTaskIssueTypes
 /**
  * @param {object} opts
  * @param {string} [opts.projectKey]  limit to one project
- * @param {'sprint'|'open'} [opts.scope] 'sprint' = active + future sprints (falls back to all open work)
+ * @param {'sprint'|'open'} [opts.scope] 'open' = all open work; 'sprint' = active + future sprints (falls back to all open work)
  */
 export async function riskRadar({ projectKey, scope = 'open', max = 100 } = {}) {
   const index = await getIndex();
@@ -46,7 +46,8 @@ export async function riskRadar({ projectKey, scope = 'open', max = 100 } = {}) 
   await Promise.all(issues.map(async (issue) => {
     const state = await getIssueState(issue.key);
     const [top] = matchChange(index, issueToChange(issue), {
-      limit: 1, minConfidence: LEVELS.medium, excludeIds: [`jira:${issue.key}`, ...state.dismissed],
+      // A manager's view must be trustworthy at a glance: strong matches only.
+      limit: 1, minConfidence: LEVELS.high, excludeIds: [`jira:${issue.key}`, ...state.dismissed],
     });
     if (!top) return;
     const m = presentMatch(top);

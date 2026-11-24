@@ -67,6 +67,9 @@ function idf(index, term) {
  * @param {{ text: string, components?: string[], labels?: string[] }} change
  * @param {{ limit?: number, minConfidence?: number, excludeIds?: string[] }} opts
  */
+/** Confidence multiplier by number of corroborating words (index = word count, capped). */
+const EVIDENCE = [0, 0.45, 0.6, 0.85, 1];
+
 export function matchChange(index, change, opts = {}) {
   const { limit = 3, minConfidence = LEVELS.low, excludeIds = [] } = opts;
   if (!index.N) return [];
@@ -103,8 +106,13 @@ export function matchChange(index, change, opts = {}) {
     const strength = 1 - Math.exp(-score / 9);
     let confidence = 0.55 * strength + 0.45 * Math.min(1, coverage * 1.6);
     if (componentHits.length) confidence = Math.min(1, confidence + 0.15);
-    // Single-term coincidences are not precedents.
-    if (contributions.length < 2 && !componentHits.length) confidence *= 0.5;
+    // Evidence: how many distinct words of the change agree with the lesson. Synonym
+    // expansion turns one word ("password") into several index terms, so count the
+    // user's words, not ours. A precedent needs corroboration: one or two shared
+    // words in a short title ("Alter logo", "Version upgrade notes") is coincidence.
+    // A component overlap counts as two words of evidence.
+    const words = new Set(contributions.map((c) => surface.get(c.term) || c.term)).size + 2 * componentHits.length;
+    confidence *= EVIDENCE[Math.min(words, EVIDENCE.length - 1)];
 
     if (confidence < minConfidence) continue;
     contributions.sort((a, b) => b.score - a.score);
